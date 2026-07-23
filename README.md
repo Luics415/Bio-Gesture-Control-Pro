@@ -110,6 +110,9 @@ El proyecto usa las siguientes tecnologías:
 
 Tkinter normalmente viene incluido con la instalación oficial de Python para Windows. Si no está disponible, debe instalarse una distribución de Python que incluya Tcl/Tk.
 
+<img width="1543" height="538" alt="image" src="https://github.com/user-attachments/assets/ddab2102-0228-40f3-9045-3b7fb0e8da79" />
+
+
 ## Cómo funciona internamente
 
 ### Captura y presentación de video
