@@ -211,6 +211,9 @@ Un movimiento rápido de la mano detectado mediante cambios repetidos de posici�
 
 Los gestos dependen de la iluminación, la distancia a la cámara, el ángulo de la mano y la posición de los dedos. Los tiempos y distancias son umbrales internos del programa y no son configurables desde una interfaz.
 
+<img width="468" height="427" alt="image" src="https://github.com/user-attachments/assets/89ff9916-3a7c-4c21-9417-3801a877a2fd" />
+
+
 ## Menú radial
 
 El menú radial aparece al mantener el pulgar levantado durante aproximadamente `0.8` segundos. Tiene ocho posiciones. Para seleccionar una opción:
@@ -575,6 +578,22 @@ Si deseas automatizar el arranque, el archivo BAT debe crearse y configurarse pa
 11. Usa el gesto de victoria durante tres segundos para pausar el control.
 12. Cierra la ventana al finalizar y ejecuta `deactivate`.
 
+<img width="1600" height="863" alt="image" src="https://github.com/user-attachments/assets/0d8536b4-e642-4e40-bc3f-21a1ea202ff7" />
+
+
 ## Licencia
 
-No se ha definido una licencia en el repositorio. Si el proyecto se distribuirá públicamente, añade un archivo de licencia y especifica las condiciones de uso, modificación y distribución.
+El código original de este proyecto se distribuye bajo la [Licencia MIT](LICENSE).
+
+Copyright (c) 2026 Luics415.
+
+La licencia MIT permite utilizar, copiar, modificar, publicar, distribuir y
+vender copias del código, siempre que se conserve el aviso de copyright y el
+texto de la licencia. El software se proporciona sin garantía.
+
+Esta licencia se aplica al código original de este repositorio. Las
+dependencias utilizadas por el proyecto, como OpenCV, MediaPipe, NumPy,
+Pillow, pynput, pycaw y comtypes, son proyectos independientes y mantienen
+sus propias licencias y avisos de copyright. Al redistribuir una instalación
+completa, revisa y conserva también los avisos exigidos por esas dependencias.
+Idea del proyecto completamente de Luics415
