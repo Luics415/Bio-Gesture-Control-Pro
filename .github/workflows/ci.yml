@@ -1,0 +1,41 @@
+name: Windows development validation
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-python312:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: x64
+          cache: pip
+          cache-dependency-path: requirements-dev.lock.txt
+      - name: Prepare reproducible environment
+        shell: pwsh
+        run: ./scripts/setup-dev.ps1 -Dev -PythonExecutable python
+      - name: Static checks
+        run: ./.venv/Scripts/python.exe -m ruff check .
+      - name: Tests and synthetic model integration without camera or desktop input
+        env:
+          BIOGESTURE_TEST_MEDIAPIPE: '1'
+        run: ./.venv/Scripts/python.exe -m pytest --junitxml=output/ci/tests.xml -o junit_logging=no
+      - name: Keep test report, without private captures or application logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-python312-tests
+          path: output/ci/tests.xml
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Safe environment report
+        run: ./.venv/Scripts/python.exe scripts/diagnose.py

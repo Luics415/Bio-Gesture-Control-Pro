@@ -1,0 +1,12 @@
+# Dependencias directas; los instaladores de desarrollo usan requirements.lock.txt.
+# Objetivo reproducible: CPython 3.12, Windows x64.
+mediapipe==0.10.21
+numpy==1.26.4
+opencv-contrib-python==4.11.0.86
+Pillow==11.3.0
+pynput==1.8.1
+pycaw==20251023
+comtypes==1.4.14
+pystray==0.19.5
+psutil==7.0.0
+

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bio-gesture-control-pro"
+version = "2.0.0.dev7"
+description = "Control del escritorio de Windows con una mano principal y una auxiliar"
+readme = "README-2.0.md"
+requires-python = ">=3.12,<3.13"
+license = "MIT"
+authors = [{ name = "Luics415" }]
+dynamic = ["dependencies"]
+
+[project.urls]
+Repository = "https://github.com/Luics415/Bio-Gesture-Control-Pro"
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.in"] }
+
+[tool.setuptools.packages.find]
+include = ["biogesture*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+extend-exclude = ["venv", ".venv", "legacy", "import sys.py"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]
