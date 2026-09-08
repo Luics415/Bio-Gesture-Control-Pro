@@ -1,4 +1,4 @@
-# Desarrollo de 2.0
+# Desarrollo de 2.7
 
 El usuario del portable no necesita estos pasos. Son para modificar el código en Windows x64 con Python 3.12 x64 y Tcl/Tk.
 
@@ -24,6 +24,6 @@ Las pruebas adicionales del modelo se habilitan con `BIOGESTURE_TEST_MEDIAPIPE=1
 
 La medición de cuadros negros sintéticos comprueba inferencia, no precisión con manos reales. En pruebas, usa `BIOGESTURE_DATA_DIR` para aislar datos. `--console` conserva la consola solo cuando se solicita expresamente.
 
-La versión 1.20.36 permanece en `legacy/v1.20.36`. No se altera el README original; el documento de la distribución nueva es `README-2.0.md`.
+La versión 1.20.36 permanece en `legacy/v1.20.36`, con su README original intacto. La documentación actual y la descripción del paquete son `README.md`; `README-2.0.md` es solo una referencia de compatibilidad. El programa y los metadatos usan `2.7.0`; la presentación pública es **2.7**, continuidad de `2.0.0-dev.7`, no una certificación de estabilidad.
 
 Consulta [Distribución](DISTRIBUTION.md) para generar el paquete portable y comprobarlo.

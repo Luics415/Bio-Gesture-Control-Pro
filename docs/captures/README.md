@@ -1,4 +1,4 @@
-# Registro de capturas para la documentación 2.0
+# Registro de capturas para la documentación 2.7
 
 ## 2026-09-07 · capturas aportadas por el usuario
 

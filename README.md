@@ -1,599 +1,459 @@
-# Bio-Gesture Control Pro
+<p align="center">
+  <img src="assets/brand/anchor-approved.png" alt="Ancla de Bio-Gesture Control Pro" width="150">
+</p>
 
-Sistema de control de la computadora mediante gestos de la mano frente a una cámara web. El proyecto utiliza visión artificial para localizar los puntos principales de una mano y convertir distintas posiciones de los dedos en movimientos del mouse, clics, desplazamiento, control de volumen y atajos de teclado.
+<h1 align="center">Bio-Gesture Control Pro 2.7</h1>
 
-> Estado actual: el programa está diseñado para Windows y utiliza una cámara compatible con OpenCV. La interfaz y los comandos están en español.
+<p align="center">Tu escritorio, tus gestos. Una mano principal y una auxiliar.</p>
+<p align="center"><strong>Desarrollado por Luics415</strong></p>
 
-## Índice
+<p align="center">
+  <a href="https://github.com/Luics415/Bio-Gesture-Control-Pro/releases/download/v2.7.0/BioGestureControlPro-2.7.0-windows-x64.zip"><strong>Descargar 2.7 para Windows</strong></a>
+  · <a href="docs/manual/Manual-de-usuario.pdf">Manual visual PDF</a>
+  · <a href="https://github.com/Luics415/Bio-Gesture-Control-Pro/archive/refs/tags/v2.7.0.zip">Código fuente ZIP</a>
+</p>
 
-- [Descripción general](#descripción-general)
-- [Características](#características)
-- [Estructura del proyecto](#estructura-del-proyecto)
-- [Tecnologías y dependencias](#tecnologías-y-dependencias)
-- [Cómo funciona internamente](#cómo-funciona-internamente)
-- [Controles mediante gestos](#controles-mediante-gestos)
-- [Menú radial](#menú-radial)
-- [Instalación desde cero](#instalación-desde-cero)
-- [Ejecución](#ejecución)
-- [Diagnóstico](#diagnóstico)
+Bio-Gesture permite controlar y navegar por el escritorio de Windows con tus manos y una cámara web. No está limitado a una aplicación: combina cursor, clics, arrastre, desplazamiento, atajos y controles del sistema. La aplicación en primer plano decide cómo interpreta cada atajo.
+
+**Versión actual: 2.7** — identificador del programa y del paquete: **2.7.0**. Este nombre reconoce el trabajo acumulado hasta `2.0.0-dev.7`; conserva sus gestos y correcciones. El cambio de número no supone siete versiones estables ni una certificación nueva.
+
+> **Edición pública de pruebas · Windows 10/11 x64 · Sin consola.** El ZIP incluye el ejecutable, Python, las dependencias, el modelo y el manual. No necesitas instalar Python para usarlo. Sigue pendiente probar una computadora limpia y obtener firma digital; no es un instalador formal.
+
+## Pruébalo en tres pasos
+
+1. **Descarga el ZIP para Windows** desde el enlace superior y usa **Extraer todo**.
+2. **Abre BioGestureControlPro.exe** dentro de la carpeta extraída. Conserva `_internal` a su lado; no copies solo el EXE.
+3. **Prepara y activa:** revisa cámara/monitor en Ajustes, muestra solo la mano que controlará el cursor y pulsa Activar. Después puedes mostrar ambas manos.
+
+**Salida rápida: Ctrl+Alt+F12** pausa las acciones y recupera la ventana. Al actualizar, cierra la versión anterior y extrae la nueva en otra carpeta: tus ajustes permanecen en el perfil de Windows.
+
+**No confundas las descargas:** «Código fuente ZIP» y «Code → Download ZIP» son para desarrollar, no contienen el EXE compilado. Para probar el programa usa **Descargar 2.7 para Windows**. El [detalle de la descarga](https://github.com/Luics415/Bio-Gesture-Control-Pro/releases/tag/v2.7.0) incluye el SHA-256 y el PDF separado.
+
+## Lo que puedes hacer
+
+- Guiar el cursor con el índice, hacer clic izquierdo/derecho y arrastrar con pinzas.
+- Usar ambas manos: principal para el mouse; auxiliar para Copiar, Pegar, Deshacer, Rehacer y scroll en L.
+- Cambiar entre ventana normal y fija transparente con cuatro recorridos laterales alternados.
+- Abrir el menú radial con el pulgar para acciones de sistema, edición, web y multimedia.
+- Calibrar tu zona cómoda, elegir monitor/cámara y trabajar con el programa en segundo plano.
+- Mantener la cámara limpia: sin textos, indicaciones ni contadores; puntos opcionales de ambas manos y radial al utilizarlo.
+
+El [manual visual de 17 páginas](docs/manual/Manual-de-usuario.pdf) incluye dibujos de los gestos y la firma del ancla con **2.7** al final. También viene junto al EXE como **Manual-de-usuario.pdf**, para leerlo sin conexión. No contiene fotografías personales.
+
+Consulta las comprobaciones y límites en [Validación](docs/VALIDATION.md) y [Distribución](docs/DISTRIBUTION.md).
+
+## Contenido
+
+- [Instalación portable y primer arranque](#instalación-portable-y-primer-arranque)
+- [Ventana, pausa y segundo plano](#ventana-pausa-y-segundo-plano)
+- [Elegir y recuperar las dos manos](#elegir-y-recuperar-las-dos-manos)
+- [Gestos de la mano principal](#gestos-de-la-mano-principal)
+- [Mano auxiliar: edición y desplazamiento en L](#mano-auxiliar-edición-y-desplazamiento-en-l)
+- [Menú radial: las 40 posiciones](#menú-radial-las-40-posiciones)
+- [Perfiles y aplicación en primer plano](#perfiles-y-aplicación-en-primer-plano)
+- [Ajustes, pestaña por pestaña](#ajustes-pestaña-por-pestaña)
+- [Calibrar una zona cómoda](#calibrar-una-zona-cómoda)
+- [Prioridades y seguridad de los gestos](#prioridades-y-seguridad-de-los-gestos)
 - [Solución de problemas](#solución-de-problemas)
-- [Limitaciones y consideraciones](#limitaciones-y-consideraciones)
-- [Flujo de uso recomendado](#flujo-de-uso-recomendado)
+- [Actualizar, conservar ajustes y retirar el portable](#actualizar-conservar-ajustes-y-retirar-el-portable)
+- [Privacidad, alcance y desarrollo](#privacidad-alcance-y-desarrollo)
+- [Versión anterior e historia](#versión-anterior-e-historia)
 
-## Descripción general
+## Instalación portable y primer arranque
 
-Bio-Gesture Control Pro transforma una cámara web en una interfaz de control sin contacto. La aplicación muestra la imagen de la cámara en una ventana de Tkinter y analiza cada cuadro en tiempo real.
+El paquete está preparado para **Windows 10/11 de 64 bits, arquitectura x64**. Incluye Python, las bibliotecas y el modelo de detección. Para usar el portable no necesitas instalar Python, Git, paquetes ni ejecutar comandos. No es un instalador ni un EXE independiente de los demás archivos.
 
-El procesamiento principal sigue este flujo:
+1. Recibe el ZIP de la revisión que vas a probar. Consulta su versión y las comprobaciones que lo acompañan; no confundas un paquete anterior con 2.7.
+2. Usa **Extraer todo** y elige una carpeta donde puedas guardar tus programas. No abras el EXE directamente dentro del ZIP.
+3. Dentro de la carpeta extraída, abre **BioGestureControlPro.exe** con doble clic. Conserva la carpeta `_internal` a su lado: contiene recursos indispensables.
+4. Espera el splash del ancla y la firma del autor. El arranque normal no necesita mostrar el símbolo del sistema.
+5. Con ajustes nuevos, abre **pausado**, con cámara 0, vista espejo y auxiliar habilitada. Entra en **Ajustes** para elegir cámara y monitor antes de activar.
+6. Deja visible solo la mano que quieres usar como principal. En cuanto se detecte un cuadro válido queda elegida; después puedes mostrar ambas.
+7. Cierra Ajustes y pulsa **Activar**. Empieza en un documento de prueba: cursor, clic, pausa y, después, los demás gestos.
 
-1. OpenCV obtiene un cuadro de la cámara.
-2. El cuadro se redimensiona a `550 x 375` píxeles y se refleja horizontalmente para que la imagen se comporte como un espejo.
-3. MediaPipe Hands identifica una mano y sus 21 puntos de referencia, llamados landmarks.
-4. El programa calcula distancias y posiciones relativas entre pulgar, índice, corazón, anular y meñique.
-5. Las condiciones geométricas resultantes se interpretan como gestos.
-6. `pynput` mueve el cursor, hace clics, desplaza la pantalla o envía teclas.
-7. Tkinter actualiza la ventana y vuelve a procesar el siguiente cuadro.
+Si no es la cámara correcta, cambia **Ajustes → Cámara → Índice de cámara**, guarda y espera la reconexión. La numeración depende del equipo; 0 suele ser la primera disponible, pero no garantiza que sea la integrada. Resolución y FPS son solicitudes: el dispositivo puede entregar otros valores.
 
-El objetivo es permitir acciones comunes de navegación, edición, reproducción multimedia y control del sistema sin tocar directamente el mouse o el teclado.
+No se usa BAT ni VBS para abrir el portable. Puedes crear un acceso directo de Windows al EXE, manteniendo la carpeta completa en su ubicación. El programa no añade inicio automático, servicios ni tareas programadas.
 
-## Características
+El binario de desarrollo no tiene firma digital Authenticode. El ancla y la firma visual del splash **no sustituyen** esa firma. No desactives las protecciones de Windows para probarlo; ante un aviso, comprueba la procedencia y el paquete recibido. Firma digital, instalador y publicación se gestionan por separado.
 
-- Control del cursor con el dedo índice.
-- Suavizado del movimiento para evitar vibraciones.
-- Clic izquierdo con pinza entre pulgar e índice.
-- Arrastre manteniendo la pinza durante más tiempo.
-- Clic derecho con pinza entre pulgar y dedo corazón.
-- Desplazamiento vertical con una postura específica de los dedos.
-- Control del volumen del sistema mediante el dedo anular.
-- Menú radial activado manteniendo el pulgar levantado.
-- Submenús de sistema, edición, web y multimedia.
-- Atajos de teclado para controlar aplicaciones activas.
-- Modo de reposo activado manteniendo el gesto de victoria durante tres segundos.
-- Cambio entre ventana normal y ventana fija mediante un movimiento rápido de la mano.
-- Dibujo visual de los landmarks y de los indicadores de estado sobre la imagen.
+## Ventana, pausa y segundo plano
 
-## Estructura del proyecto
+La ventana mide **550 × 375 píxeles**: barra superior de 28, área de cámara de 550 × 335 y franja inferior de 12. El video conserva su proporción, por lo que pueden aparecer márgenes. Cambiar la resolución de captura no agranda la ventana.
 
-```text
-Bio-Gesture Control Pro/
-|
-|-- control.py          Programa principal de control por gestos.
-|-- import sys.py       Diagnóstico de la versión e intérprete de Python.
-|-- INICIAR_CONTROL.vbs Lanzador silencioso que intenta ejecutar un archivo BAT.
-|-- .gitignore          Evita subir venv, cachés y archivos sensibles.
-|-- README.md           Documentación del proyecto.
-|-- venv/               Entorno virtual local; no debe subirse a GitHub.
-```
+Los controles principales son **Activar/Pausar**, **Ajustes** y **Más**. El radial se maneja con gestos: sus rótulos no son botones para hacer clic con el mouse.
 
-### `control.py`
+| Control | Qué hace | ¿La cámara sigue encendida? |
+| --- | --- | --- |
+| Pausar | Detiene acciones y suelta botones retenidos. Mantiene detección para victoria y cambio de ventana | Sí |
+| Activar | Reanuda acciones; requiere cámara disponible y diálogos de configuración cerrados | Sí |
+| Más → Ocultar en la bandeja | Oculta la ventana; si estaba activo, sigue actuando en segundo plano | Sí |
+| Más → Apagar cámara | Pausa y cierra la captura del dispositivo | No, al terminar el cierre |
+| Más → Encender cámara | Reconecta; el control permanece pausado hasta que lo actives | Sí, tras conectarse |
+| Más → Salir, bandeja → Salir o cerrar con X | Libera entradas, cierra cámara e integraciones y termina el programa | No |
 
-Es el archivo principal. Contiene la interfaz, la captura de cámara, el detector de manos, el menú radial, la detección de gestos y la ejecución de comandos.
+**Ocultar no significa pausar ni apagar.** Para liberar la webcam utiliza Apagar cámara o Salir. Para detener gestos sin perder la posibilidad de reanudar con la mano utiliza Pausar.
 
-### `import sys.py`
+### Recuperación rápida
 
-Es una herramienta de comprobación. Muestra:
+**Ctrl+Alt+F12** pausa las acciones y recupera la ventana, siempre que el atajo global esté disponible. Conserva teclado y mouse al alcance durante las primeras pruebas. Desde el ancla de la bandeja de Windows puedes mostrar la cámara, pausar, alternar normal/fija, encender/apagar cámara, abrir Configuración o salir. Si no ves el icono, revisa los iconos ocultos junto al reloj. **Alt+M**, con la ventana del programa enfocada, abre Más.
 
-- La versión de Python activa.
-- La ruta exacta del ejecutable usado.
-- Si MediaPipe puede importarse correctamente.
+### Ventana normal y fija transparente
 
-El nombre contiene espacios, por lo que debe ejecutarse entre comillas desde PowerShell.
+- **Normal:** tiene bordes y opacidad completa.
+- **Fija:** sin bordes, encima de otras ventanas y con opacidad inicial del **85 %**, ajustable. La transparencia afecta a la ventana completa; no implica que los clics la atraviesen.
 
-### `INICIAR_CONTROL.vbs`
+Alterna con **Más → Fijar ventana transparente / Volver a ventana normal**, con la bandeja o con la onda de la principal. Arrastra desde el espacio libre de la barra superior para recolocarla. La onda también cambia el modo estando pausado; no activa el control.
 
-Este script intenta abrir de forma oculta el comando:
+### Vista limpia y puntos de las manos
 
-```text
-ACTIVAR_CAMARA.bat
-```
+El área de cámara conserva únicamente el video, los puntos opcionales y el radial cuando se utiliza. **No muestra mensajes, estados ni indicaciones**, tanto en el EXE como al ejecutar desde el código o con `--diagnostics`. Los controles de la barra y los diálogos de Ajustes permanecen disponibles.
 
-Ese archivo BAT no se encuentra en la estructura actual del proyecto. Por ello, la forma funcional y recomendada de iniciar la aplicación en el estado actual es ejecutar directamente `python control.py`. El VBS solo funcionará cuando exista un `ACTIVAR_CAMARA.bat` válido en la carpeta esperada.
+**Ajustes → Escritorio → Dibujar puntos de mano** controla por sí sola los puntos y conexiones de **ambas manos**, también en vista limpia. Está desmarcada en una configuración nueva. Si ya la tenías marcada, se respeta esa preferencia: actualizar no la desactiva. Marcarla no activa mensajes ni ayudas de diagnóstico. Guarda los ajustes, espera la reconexión y vuelve a activar cuando quieras continuar.
 
-### `venv/`
+Métricas y estado se consultan en **Ajustes → Diagnóstico**. Las opciones técnicas `--clean-ui` y `--diagnostics` se conservan, pero **ninguna habilita textos dentro de la cámara**. Solo `--diagnostics`, solicitado expresamente, añade un estado en la franja inferior **fuera del video**; el inicio normal desde EXE, fuente o VBS no lo muestra. `--clean-ui` mantiene esa franja sin estado. No necesitas estas opciones para el uso normal. Los errores que impiden arrancar pueden mostrar un diálogo separado para que puedas identificar el problema.
 
-Es el entorno virtual local de Python. Contiene paquetes instalados y archivos binarios de gran tamaño, como OpenCV, MediaPipe y JAX. No es código fuente y no debe subirse al repositorio. Cada equipo debe crear su propio entorno virtual.
+## Elegir y recuperar las dos manos
 
-## Tecnologías y dependencias
+Principal y auxiliar son **roles**, no identidades personales ni manos derecha/izquierda obligatorias. Cualquiera de tus manos puede ocupar cualquiera de los roles. La etiqueta histórica «ADMIN» del menú no elige roles: corresponde al Administrador de tareas.
 
-El proyecto usa las siguientes tecnologías:
+1. Al iniciar la detección, muestra **solo la mano elegida como principal**. No exige mantener una pose ni esperar un segundo; basta la primera detección válida.
+2. Si empezaste con ambas visibles, retira una momentáneamente y deja que se detecte la elegida. Luego vuelve a mostrar la segunda.
+3. La principal controla el cursor y conserva sus gestos. La auxiliar añade sus propias pinzas y la L, **sin tomar el cursor**.
 
-- **Python**: lenguaje principal.
-- **OpenCV (`cv2`)**: captura, transformación y dibujo sobre imágenes de la cámara.
-- **MediaPipe Hands**: detección de una mano y sus 21 landmarks.
-- **NumPy**: cálculos de distancias, interpolación, ángulos y coordenadas.
-- **Tkinter**: ventana gráfica y ciclo de actualización.
-- **Pillow (`PIL`)**: conversión de cuadros de OpenCV para mostrarlos en Tkinter.
-- **pynput**: control programático del mouse y el teclado.
-- **pycaw**: lectura y modificación del volumen maestro de Windows.
-- **comtypes**: acceso COM requerido por pycaw.
-- **ctypes**: conversión de interfaces de audio de Windows.
+Tras perder detección, el sistema intenta recuperar los roles automáticamente. No hay que retirar ambas manos ni reiniciar por cada interrupción. Si se cruzan, se ocultan o no se distinguen de forma fiable, algunas observaciones se descartan para no inventar acciones. Esto no es identificación biométrica ni garantiza resolver cualquier solapamiento real.
 
-Tkinter normalmente viene incluido con la instalación oficial de Python para Windows. Si no está disponible, debe instalarse una distribución de Python que incluya Tcl/Tk.
+Para intercambiar papeles usa **Más → Reelegir mano principal**. Pausa el control y borra la elección anterior; deja una sola mano visible para elegirla y pulsa Activar cuando esté lista. Reiniciar la cámara también inicia una nueva selección de roles.
 
-<img width="1543" height="538" alt="image" src="https://github.com/user-attachments/assets/ddab2102-0228-40f3-9045-3b7fb0e8da79" />
+La auxiliar viene habilitada. Puedes desactivarla en **Más → Desactivar mano auxiliar** o desmarcando **Ajustes → Escritorio → Comandos de mano auxiliar**. Bloquea sus comandos; no cambia la principal ni apaga la cámara. La activación/desactivación manual es el mecanismo actual: no existe un gesto nuevo oculto de autorización «admin/invitado».
 
+## Gestos de la mano principal
 
-## Cómo funciona internamente
+En las referencias de puntos, **4** es la punta del pulgar, **8** la del índice, **12** la del corazón, **16** la del anular y **20** la del meñique. No necesitas ver los puntos para usar los gestos.
 
-### Captura y presentación de video
+Los tiempos y distancias siguientes son los valores iniciales. Una «palma» es una medida calculada a partir de la mano detectada, no una distancia fija en centímetros.
 
-La clase `AplicacionGestos` crea una ventana fija de `550 x 375` píxeles. OpenCV intenta abrir la cámara con `cv2.CAP_DSHOW` y solicita una captura de `1920 x 1080` a 60 FPS usando MJPG. Antes de mostrar cada cuadro, la imagen se reduce a la resolución de la ventana y se voltea horizontalmente.
+| Gesto | Acción y forma de terminar |
+| --- | --- |
+| Mover el índice | Mueve el cursor con la punta del índice. No exige los otros dedos doblados; los gestos exclusivos tienen prioridad |
+| Cerrar pulgar–índice, 4–8, y abrir | Clic izquierdo: cerrar presiona el botón y abrir lo suelta, como un mouse. Sin espera artificial para empezar a pulsar |
+| Mantener pulgar–índice y mover | Arrastre hasta abrir. El indicador cambia a arrastre a los **0.35 s**; no retrasa la pulsación |
+| Pinza pulgar–corazón, 4–12 | Un clic derecho en la posición del índice. Abre antes de repetir |
+| Pinza pulgar–anular, 4–16, y mover verticalmente | Subir aumenta volumen; bajar lo reduce. Quieta no repite cambios; abrir termina |
+| Índice/corazón juntos y extendidos; pulgar recogido, anular/meñique doblados | Desplazar arriba tras **0.7 s**; continúa mientras mantengas la pose |
+| Esa pareja junta, pero doblada y separada del anular; pulgar recogido y otros dedos doblados | Desplazar abajo tras **0.7 s**. Cambiar de dirección reinicia la espera; un puño normal no basta |
+| Victoria: índice/corazón extendidos y separados, anular/meñique doblados, pulgar separado del índice y sin tocar corazón/anular | Mantener **2 s** alterna pausa/activación. Suelta antes de repetir; apoyar el pulgar en el anular impide reanudar |
+| Pulgar extendido, otros cuatro dedos doblados, sin pinza | Mantener **0.8 s** abre el radial. No exige apuntar el pulgar verticalmente hacia arriba |
+| Mantener esa pose y desplazar el pulgar desde donde abriste el menú | Mantener una dirección **1 s** selecciona; vuelve al punto de apertura para otra selección. Dejar la pose cierra |
+| Mano abierta relajada con movimiento lateral alternado | **Cuatro recorridos y tres cambios de dirección** dentro de **2.2 s** alternan normal/fija; también pausado |
 
-La cámara debe estar conectada y disponible para que `VideoCapture(0)` pueda obtener imágenes. El índice `0` representa normalmente la cámara principal del equipo.
+La pinza cierra por debajo de **0.25 palmas** y abre desde **0.36 palmas**. El margen evita abrir/cerrar por pequeños temblores; ambos límites son ajustables. Un clic izquierdo completado al abrir no añade un segundo clic artificial. Si se pierde la mano, se pausa o cambia una pose incompatible, se libera el botón retenido; si se interrumpió esa pinza, ábrela antes de iniciar otra.
 
-### Detección de la mano
+### La onda de cambio de ventana
 
-MediaPipe se configura para detectar una sola mano con:
+Abre la mano de forma relajada: se aceptan al menos **tres de los cuatro dedos largos abiertos**, sin exigir el pulgar estirado. Desplaza la palma a un lado, al otro, al primero y al segundo, o empieza al revés. Cada recorrido debe medir al menos **media palma**; no basta mover solo las puntas ni hacer un único barrido.
 
-- Complejidad de modelo `1`.
-- Confianza mínima de detección `0.7`.
-- Confianza mínima de seguimiento `0.7`.
+Mantén la altura aproximadamente estable y la mano visible. El primer recorrido todavía permite mover el cursor; desde el segundo se reserva el movimiento para completar la onda. Tras cambiar de modo hay una espera antirrepetición de **0.30 s**: luego puedes iniciar otra secuencia sin cerrar la mano. Una pinza cancela el intento de onda y conserva su función de clic o volumen.
 
-Los puntos usados con mayor frecuencia son:
+## Mano auxiliar: edición y desplazamiento en L
 
-- `4`: punta del pulgar.
-- `8`: punta del índice.
-- `12`: punta del dedo corazón.
-- `16`: punta del anular.
-- `20`: punta del meñique.
+### Cuatro pinzas de edición
 
-También se consultan los puntos intermedios de cada dedo para decidir si está doblado o extendido.
+| Pinza de la auxiliar | Mantener | Acción enviada |
+| --- | --- | --- |
+| Pulgar–índice, 4–8 | **0.45 s** | Copiar · Ctrl+C |
+| Pulgar–corazón, 4–12 | **0.45 s** | Pegar · Ctrl+V |
+| Pulgar–anular, 4–16 | **0.45 s** | Deshacer · Ctrl+Z |
+| Pulgar–meñique, 4–20 | **0.45 s** | Rehacer · Ctrl+Y |
 
-### Movimiento del mouse
+Cada pinza produce **un comando hasta abrirla**. Mantenerla cerrada no repite. Si se perdió la mano después de ejecutar, volver con la misma pinza tampoco autoriza otra ejecución: primero debe observarse abierta.
 
-La posición normalizada del índice se convierte al espacio de una pantalla de `1920 x 1080`. El rango útil de la cámara se limita aproximadamente entre `0.1` y `0.9` en los ejes horizontal y vertical.
+Selecciona el contenido y enfoca la aplicación destino antes de Copiar/Pegar. Los cuatro atajos son independientes del perfil de la principal y no abren un editor. Funcionan donde se reconozcan, no solo en VS Code. **Rehacer envía Ctrl+Y**: algunas aplicaciones usan otra combinación o interpretan Ctrl+Y de otra manera. Este mapa sustituye Guardar, Buscar, Terminal y Paleta de revisiones anteriores.
 
-El movimiento se suaviza con un factor de `5` para que pequeños cambios de los landmarks no produzcan un cursor inestable.
+### Desplazamiento continuo con L
 
-### Clic izquierdo y arrastre
+Forma una **L con pulgar e índice claramente separados**, aproximadamente en ángulo recto, y recoge corazón, anular y meñique. Se acepta un ángulo visible de **55–125°** con leve curvatura natural; no hace falta forzar una L rígida. Mantén la pose **0.45 s**. Juntar pulgar e índice es una pinza de Copiar, no una L.
 
-El programa calcula la distancia entre pulgar e índice:
+El desplazamiento usa el **centro de la palma respecto al centro fijo de la imagen de cámara**, no la punta del índice, el cursor ni el lugar donde empezaste. La palma se estima con la muñeca y las bases de los cuatro dedos. Las zonas se refieren al video, no a la pantalla completa ni a sus márgenes.
 
-- Una pinza breve produce un clic izquierdo.
-- Una pinza mantenida durante más de `0.3` segundos inicia un arrastre.
-- Al separar los dedos se libera el botón izquierdo.
+| Centro de la palma en la imagen | Resultado manteniendo la L |
+| --- | --- |
+| Por encima del 45 % de su altura | Desplazamiento arriba |
+| Banda central, del 45 % al 55 % | Detenido |
+| Por debajo del 55 % de su altura | Desplazamiento abajo |
+| Más lejos del centro | Más velocidad, hasta el máximo configurado |
 
-### Clic derecho
+No hacen falta sacudidas: una L quieta **fuera** de la banda desplaza continuamente; una L quieta **dentro** se detiene. Desde dev.6, fuera de la banda parte del **25 % de la velocidad configurada** y aumenta progresivamente hasta el máximo hacia los bordes. Con el valor inicial de 6, equivale aproximadamente a **1.5–6 pasos de rueda por segundo**. Evita una respuesta casi nula al salir apenas del centro. Las líneas por paso dependen de Windows y de la aplicación.
 
-Cuando la distancia entre el pulgar y el dedo corazón es menor que el umbral definido, se produce un clic derecho. Existe una espera mínima de `0.6` segundos entre clics derechos para evitar repeticiones involuntarias.
+Volver al centro o dejar la L detiene el scroll. Una pinza, pérdida de detección, pausa o acción prioritaria también lo cancela, sin guardar una ráfaga para después. Al recuperarla debes mantenerla de nuevo 0.45 s; puede comenzar directamente arriba o abajo, sin pasar antes por el centro. Las inversiones del cursor no invierten este gesto: arriba/abajo corresponden a la imagen.
 
-### Desplazamiento
+### Primera prueba: arriba → centro → abajo
 
-Cuando índice y corazón están muy juntos, el programa evalúa una postura de desplazamiento. Después de mantenerla durante `1.5` segundos:
+1. Abre un documento o página de prueba con suficiente contenido en ambos sentidos. Colócate aproximadamente a la mitad y deja esa aplicación enfocada.
+2. Comprueba control activo, auxiliar habilitada y Ajustes cerrados. Puedes marcar Dibujar puntos de mano durante la preparación; no es un requisito del gesto.
+3. Evita pinza, menú, scroll u onda de la principal. Una vez asignados los roles, puedes retirar momentáneamente la principal para aislar la auxiliar; no vuelvas a elegir roles a mitad de la prueba.
+4. Forma la L con la palma en el centro del video y mantenla 0.45 s. Debe permanecer sin desplazarse.
+5. Sube **la palma completa** manteniendo la L. Por encima de la banda debe desplazar arriba. Una salida pequeña puede tardar una fracción de segundo en completar el primer paso tras confirmar; no se espera una rueda nueva en cada cuadro.
+6. Vuelve al centro: debe detenerse. Baja la palma por debajo de la banda y comprueba desplazamiento abajo.
+7. Suelta la L mientras desplaza: debe detenerse. Vuelve a formarla directamente abajo, espera su confirmación y comprueba que retoma hacia abajo sin saltos acumulados.
 
-- Dedos extendidos: desplaza hacia arriba.
-- Dedos doblados: desplaza hacia abajo.
+Si no ocurre nada, comprueba que el documento tenga desplazamiento disponible, conserve el foco y no esté en su extremo. Después revisa rol, pose, visibilidad de los dedos recogidos y posición del **centro de palma**, no de la punta del índice. La comodidad debe verificarse en tu cámara; esta guía no certifica cualquier mano o iluminación.
 
-Mientras el modo de desplazamiento está activo, el índice deja de controlar la posición del cursor.
+## Menú radial: las 40 posiciones
 
-### Control de volumen
+Abre el radial con el pulgar de la **principal** durante 0.8 s. Manteniendo la pose, desplaza el pulgar en la dirección de una etiqueta y permanece allí **1 s**. La barra horizontal indica el tiempo de selección; cambiar de dirección reinicia la espera.
 
-La aplicación intenta localizar el dispositivo de audio predeterminado de Windows al iniciar. Si pycaw no puede acceder al dispositivo, el resto del programa continúa, pero el gesto de volumen no estará disponible.
+La referencia es **la posición del pulgar al abrirlo**, no el centro dibujado del radial. Después de ejecutar una acción, entrar en un grupo o volver, regresa a esa posición para preparar otra selección. Dejar la pose cierra el menú; la siguiente apertura empieza en el principal.
 
-El gesto se activa al acercar el pulgar y el anular. Después se compara la posición vertical del anular con su posición inicial:
+Las cinco tablas contienen las **40 posiciones** conservadas, incluidas entradas a grupos y Volver. En todas se avanza en sentido horario desde la derecha. No hay un gesto distinto por comando: comparten apertura, dirección y espera.
 
-- Moverlo hacia arriba aumenta el volumen.
-- Moverlo hacia abajo reduce el volumen.
+### Principal
 
-El volumen se limita entre `0%` y `100%` y se dibuja una barra de nivel en la esquina inferior izquierda.
-
-### Modo de reposo
-
-El gesto de victoria, con índice y corazón extendidos y los otros dedos doblados, inicia una barra de progreso. Si se mantiene durante `3` segundos, cambia el estado de reposo.
-
-En modo de reposo se muestra `MODO REPOSO` y se suspenden las acciones de control mientras se mantiene la aplicación abierta.
-
-### Cambio de ventana
-
-Un movimiento rápido de la mano detectado mediante cambios repetidos de posición horizontal activa o desactiva el modo de ventana fija. En ese modo la ventana:
-
-- No muestra los bordes normales.
-- Se mantiene encima de otras ventanas.
-- Usa una transparencia aproximada de `85%`.
-
-## Controles mediante gestos
-
-| Gesto | Acción |
-|---|---|
-| Índice apuntando | Mover el cursor |
-| Pulgar + índice, separación rápida | Clic izquierdo |
-| Pulgar + índice, mantener más de 0.3 s | Arrastrar |
-| Pulgar + corazón juntos | Clic derecho |
-| Índice y corazón juntos, mantener postura | Activar desplazamiento |
-| Desplazamiento con dedos extendidos | Desplazar hacia arriba |
-| Desplazamiento con dedos doblados | Desplazar hacia abajo |
-| Pulgar + anular | Activar control de volumen |
-| Anular hacia arriba | Aumentar volumen |
-| Anular hacia abajo | Disminuir volumen |
-| Pulgar levantado durante 0.8 s | Abrir menú radial |
-| Gesto de victoria durante 3 s | Activar o desactivar reposo |
-| Movimiento rápido lateral repetido | Alternar ventana fija |
-
-Los gestos dependen de la iluminación, la distancia a la cámara, el ángulo de la mano y la posición de los dedos. Los tiempos y distancias son umbrales internos del programa y no son configurables desde una interfaz.
-
-<img width="468" height="427" alt="image" src="https://github.com/user-attachments/assets/89ff9916-3a7c-4c21-9417-3801a877a2fd" />
-
-
-## Menú radial
-
-El menú radial aparece al mantener el pulgar levantado durante aproximadamente `0.8` segundos. Tiene ocho posiciones. Para seleccionar una opción:
-
-1. Mantén el pulgar levantado para abrir el menú.
-2. Dirige el pulgar hacia una de las ocho opciones.
-3. Mantén la dirección durante aproximadamente `1.2` segundos.
-4. La opción se ejecutará cuando termine el indicador circular.
-
-Algunas opciones abren un submenú y otras envían directamente un comando al sistema.
-
-### Menú principal
-
-| Opción | Función |
-|---|---|
-| SISTEMA | Abrir controles del sistema |
-| EDICION | Abrir controles de edición |
-| WEB | Abrir controles del navegador |
-| MEDIA | Abrir controles multimedia |
-| MAYUS | Activar o desactivar Caps Lock |
-| PESTANYA | Cambiar de ventana con Alt+Tab |
-| INICIO | Presionar la tecla Windows |
-| ESC | Presionar Escape |
+| Dirección | Etiqueta | Resultado |
+| --- | --- | --- |
+| Derecha | Sistema | Abre el grupo Sistema |
+| Abajo-derecha | Edición | Abre el grupo Edición |
+| Abajo | Web | Abre el grupo Web |
+| Abajo-izquierda | Multimedia | Abre el grupo Multimedia |
+| Izquierda | Mayúsculas | Alterna Bloq Mayús; no mantiene Mayús presionada |
+| Arriba-izquierda | Ventanas | Alt+Tab: cambia de ventana, no de pestaña |
+| Arriba | Inicio | Pulsa la tecla Windows |
+| Arriba-derecha | Escape | Pulsa Esc |
 
 ### Sistema
 
-| Opción | Comando o intención |
-|---|---|
-| CONFIG | Reservado para configuración |
-| ADMIN | Reservado para administración |
-| BLOQUEAR | Reservado para bloqueo |
-| BUSCAR | Reservado para búsqueda |
-| VOL+ | Reservado para subir volumen |
-| VOL- | Reservado para bajar volumen |
-| MUTE | Silenciar mediante la tecla `m` |
-| VOLVER | Regresar al menú principal |
-
-Las opciones marcadas como reservadas aparecen en el menú, pero no tienen una implementación específica en `ejecutar_comando_pro` en la versión actual.
+| Dirección | Etiqueta | Resultado |
+| --- | --- | --- |
+| Derecha | Ajustes | Abre configuración y pausa |
+| Abajo-derecha | Tareas | Abre el Administrador de tareas de Windows |
+| Abajo | Bloquear | Bloquea la sesión **al completar la selección, sin otra confirmación** |
+| Abajo-izquierda | Buscar | Windows+S en Global/Multimedia; Ctrl+F en Navegador/VS Code |
+| Izquierda | Volumen + | Sube volumen de Windows |
+| Arriba-izquierda | Volumen − | Baja volumen de Windows |
+| Arriba | Silenciar | Alterna silencio de Windows |
+| Arriba-derecha | Volver | Regresa al principal |
 
 ### Edición
 
-| Opción | Atajo |
-|---|---|
-| COPIAR | Ctrl+C |
-| PEGAR | Ctrl+V |
-| DESHACER | Ctrl+Z |
-| REHACER | Ctrl+Y |
-| CORTAR | Ctrl+X |
-| TODO | Ctrl+A |
-| DELETE | Delete |
-| VOLVER | Regresar al menú principal |
+| Dirección | Etiqueta | Resultado |
+| --- | --- | --- |
+| Derecha | Copiar | Ctrl+C |
+| Abajo-derecha | Pegar | Ctrl+V |
+| Abajo | Deshacer | Ctrl+Z |
+| Abajo-izquierda | Rehacer | Ctrl+Y |
+| Izquierda | Cortar | Ctrl+X |
+| Arriba-izquierda | Seleccionar todo | Ctrl+A |
+| Arriba | Eliminar | Suprimir; depende de selección y aplicación |
+| Arriba-derecha | Volver | Regresa al principal |
+
+Las pinzas auxiliares no eliminan esos comandos de Edición. Practica con contenido prescindible: Cortar, Eliminar, Deshacer o cerrar una pestaña pueden modificar el trabajo de la ventana activa.
 
 ### Web
 
-| Opción | Atajo |
-|---|---|
-| NUEVA T | Ctrl+T |
-| CERRAR T | Ctrl+W |
-| RECARGAR | F5 |
-| REGRESAR | Alt+Flecha izquierda |
-| AVANCE | Alt+Flecha derecha |
-| FAVORITOS | Ctrl+D |
-| DESCARGA | Ctrl+J |
-| VOLVER | Regresar al menú principal |
+| Dirección | Etiqueta | Resultado |
+| --- | --- | --- |
+| Derecha | Nueva pestaña | Ctrl+T |
+| Abajo-derecha | Cerrar pestaña | Ctrl+W |
+| Abajo | Recargar | F5 |
+| Abajo-izquierda | Atrás | Alt+Izquierda |
+| Izquierda | Adelante | Alt+Derecha |
+| Arriba-izquierda | Favoritos | Ctrl+D |
+| Arriba | Descargas | Ctrl+J |
+| Arriba-derecha | Volver | Regresa al principal |
+
+Estos atajos no abren ni seleccionan automáticamente un navegador. Fuera de él pueden tener otro significado: F5 no siempre significa recargar.
 
 ### Multimedia
 
-| Opción | Atajo |
-|---|---|
-| PLAY/PAUSE | `k` |
-| SIGUIENTE | Shift+N |
-| ATRAS 10s | `j` |
-| ADELAN 10s | `l` |
-| MUTE | `m` |
-| FULLSCREEN | `f` |
-| SUBTITULOS | `c` |
-| VOLVER | Regresar al menú principal |
+| Dirección | Etiqueta | Resultado |
+| --- | --- | --- |
+| Derecha | Play/pausa | Tecla multimedia de Windows: reproducir/pausar |
+| Abajo-derecha | Siguiente | Tecla multimedia de Windows: siguiente pista |
+| Abajo | −10 s | `j`, solo en perfil Multimedia, pensado para YouTube |
+| Abajo-izquierda | +10 s | `l`, solo en perfil Multimedia, pensado para YouTube |
+| Izquierda | Silenciar | Alterna silencio de Windows |
+| Arriba-izquierda | Pantalla completa | `f` en Multimedia; F11 en Navegador/VS Code; no disponible en Global |
+| Arriba | Subtítulos | `c`, solo en perfil Multimedia, pensado para YouTube |
+| Arriba-derecha | Volver | Regresa al principal |
 
-Los comandos multimedia basados en letras funcionan especialmente bien en aplicaciones como reproductores web que interpretan esas teclas, pero su resultado depende de la ventana que esté activa.
+Las teclas multimedia pueden ser atendidas por el reproductor que Windows tenga asociado. Las letras `j`, `l`, `c` y `f` necesitan el reproductor compatible enfocado, sin un campo de texto capturándolas. No son controles universales de cualquier reproductor.
 
-## Instalación desde cero
+## Perfiles y aplicación en primer plano
 
-Los siguientes pasos están pensados para un equipo Windows sin el entorno virtual de este proyecto.
+El perfil se elige **manualmente** en **Ajustes → Escritorio → Perfil**. No detecta automáticamente la aplicación, no abre un programa al cambiarlo y no modifica las ocho posiciones de cada menú.
 
-### 1. Instalar Python
+| Perfil | Buscar | Pantalla completa | −10 s / +10 s / Subtítulos |
+| --- | --- | --- | --- |
+| Global | Windows+S | No disponible | No disponibles |
+| VS Code | Ctrl+F | F11 | No disponibles |
+| Navegador | Ctrl+F | F11 | No disponibles |
+| Multimedia | Windows+S | `f`, pensado para YouTube | `j` / `l` / `c`, pensados para YouTube |
 
-1. Descarga Python desde la página oficial:
-   [https://www.python.org/downloads/windows/](https://www.python.org/downloads/windows/)
-2. Ejecuta el instalador.
-3. En la primera pantalla activa la casilla **Add Python.exe to PATH**.
-4. Selecciona **Install Now**.
-5. Cierra y vuelve a abrir PowerShell o VS Code.
-6. Comprueba la instalación:
+Los demás comandos comunes conservan sus atajos. VS Code no convierte la auxiliar en Guardar/Terminal/Paleta: sus pinzas siguen siendo Copiar/Pegar/Deshacer/Rehacer. Los perfiles no son un editor libre de combinaciones de teclas.
 
-```powershell
-python --version
-```
+Si eliges una acción no disponible en el perfil, el programa **pausa el control** y registra el motivo. Consúltalo en Ajustes → Diagnóstico, cambia el perfil si corresponde, cierra Ajustes y activa. En vista limpia no se superpone ese mensaje a la cámara.
 
-También puedes probar el lanzador de Windows:
+## Ajustes, pestaña por pestaña
 
-```powershell
-py --version
-```
+Abrir Ajustes **pausa** las acciones. **Guardar** valida los valores, los conserva, aplica los cambios y reinicia la cámara; permanece pausado. Tras reconectarse, deja visible la principal sola para asignarla y después activa. **Cancelar** cierra sin aplicar los campos editados, pero no reactiva. La calibración tiene su propio guardado al completar las dos capturas: Cancelar en Ajustes no revierte una calibración ya guardada.
 
-Se recomienda Python de 64 bits. Si `python` no se reconoce, usa `py` en los comandos siguientes o reinstala Python activando la opción para agregarlo al PATH.
+Escribe decimales con **punto**, como `0.25` o `0.85`. Un valor inválido muestra un aviso para corregirlo. La ventana de ajustes puede redimensionarse y tiene barras de desplazamiento para escalados grandes.
 
-### 2. Instalar Git y descargar el proyecto
+### Cámara
 
-Instala Git para Windows desde:
+| Campo | Inicial | Significado |
+| --- | --- | --- |
+| Índice de cámara | 0 | Dispositivo que se abre; admite 0–16. Cambia si hay varias cámaras o una virtual |
+| Ancho solicitado | 640 | Resolución horizontal de captura; no el ancho de la ventana |
+| Alto solicitado | 480 | Resolución vertical de captura; el video se encaja sin deformarse |
+| FPS de cámara | 30 | Frecuencia solicitada al dispositivo; puede no alcanzarla |
+| FPS de detección | 30 | Límite de frecuencia del análisis; bajar reduce trabajo, con menos actualizaciones |
+| Vista espejo | Activada | Refleja horizontalmente la imagen. Revisa calibración si lo cambias |
 
-[https://git-scm.com/download/win](https://git-scm.com/download/win)
+Empieza con 640 × 480 y valores iniciales; subir resolución o FPS no garantiza mejor respuesta. Si hay demasiado consumo, prueba un límite de detección menor y compara comodidad y métricas. No se promete una mejora porcentual para todos los equipos.
 
-Después clona el repositorio:
+### Precisión
 
-```powershell
-git clone https://github.com/Luics415/Bio-Gesture-Control-Pro.git
-cd Bio-Gesture-Control-Pro
-```
+| Campo | Inicial | Significado |
+| --- | --- | --- |
+| Cierre de pinza / palma | 0.25 | Distancia para reconocer pinza. Mayor permite cerrarla con más separación |
+| Apertura de pinza / palma | 0.36 | Distancia para soltar. Debe superar el cierre; el margen reduce oscilaciones |
+| Indicador de arrastre (s) | 0.35 | Tiempo para cambiar el indicador; **no retrasa** la pulsación real |
+| Suavizado en reposo | 1.8 | Menor filtra más temblor, pero puede sentirse más lento; mayor sigue más los cambios |
+| Respuesta al movimiento | 0.03 | Aumentarlo reduce filtrado cuando te mueves; equilibra respuesta y temblor |
+| Velocidad de desplazamiento | 6 | Máximo de pasos de rueda por segundo de la L; también velocidad del scroll principal. Admite 1–20 |
+| Sensibilidad de volumen | 1.5 | Mayor produce más respuesta al movimiento vertical de la pinza de volumen |
+| Invertir horizontal | Desactivada | Invierte el cursor horizontal, no las direcciones del menú |
+| Invertir vertical | Desactivada | Invierte el cursor vertical, no la L ni el gesto de volumen |
 
-Si ya tienes la carpeta descargada, entra directamente en ella:
+Los umbrales de pinza se comparten entre principal y auxiliar. Ajusta una cosa a la vez y prueba sobre contenido prescindible. Pausa, apertura/selección radial y confirmación de L mantienen los tiempos descritos; no todos los parámetros internos aparecen como campos editables.
 
-```powershell
-cd "E:\Respaldo Luis\Bio-Gesture Control Pro"
-```
+### Escritorio
 
-### 3. Crear un entorno virtual nuevo
+| Campo | Inicial | Significado |
+| --- | --- | --- |
+| Monitor | `primary` | `primary`: principal de Windows; `virtual`: todas las pantallas; otros identificadores: una concreta |
+| Perfil | Global | Cambia atajos dependientes de aplicación según la tabla de perfiles |
+| Opacidad fija (0.4–1) | 0.85 | 0.85 = 85 %. No modifica opacidad del modo normal |
+| Iniciar pausado | Activado | Estado de acciones al abrir. Desmarcar permite iniciar activo; evita hacerlo en las primeras pruebas |
+| Dibujar puntos de mano | Desactivado en ajustes nuevos | Puntos y conexiones de ambas manos, independiente de vista limpia. Respeta una preferencia existente marcada |
+| Comandos de mano auxiliar | Activado | Habilita sus cuatro pinzas y L. También se cambia en Más |
+| Calibrar zona de trabajo… | Botón | Ajusta el área cómoda del índice para cubrir el monitor seleccionado |
 
-Dentro de la carpeta del proyecto ejecuta:
+Cambiar la distribución física de monitores hace que el programa pause y restablezca el mapeo. Revisa Monitor y calibra si corresponde antes de reanudar.
 
-```powershell
-python -m venv venv
-```
+### Diagnóstico
 
-Si usas el lanzador `py`:
+Muestra versión, recordatorio de controles, estado y ruta de configuración/registros. Incluye **FPS de captura**, **tiempo de detección**, **CPU**, **memoria** y **antigüedad del cuadro**, actualizados al consultar la pestaña. El tiempo de detección no es la latencia completa entre tu movimiento y la respuesta del escritorio. Como Ajustes pausa acciones, estas métricas tampoco sustituyen una prueba de respuesta durante uso activo.
 
-```powershell
-py -m venv venv
-```
+**Abrir carpeta de diagnóstico** abre la ubicación de datos. Normalmente es `%LOCALAPPDATA%\BioGestureControlPro`: contiene `settings.json`, `biogesture.log` y, cuando se generan, registros nativos. No necesitas editarlos para usar el programa. Antes de compartir registros, revísalos: pueden contener rutas del equipo o mensajes de dependencias.
 
-Esto crea una carpeta `venv` local. No la subas a GitHub.
+## Calibrar una zona cómoda
 
-### 4. Activar el entorno virtual
+Convierte un rectángulo alcanzable por tu índice en toda el área del monitor seleccionado. Por defecto usa el 12–88 % de la imagen en cada eje; no hace falta llevar la mano hasta los bordes de cámara.
 
-En PowerShell:
+1. Elige cámara, espejo y monitor; **guarda primero** y espera la reconexión.
+2. Elige la principal mostrando solo esa mano. Abre **Ajustes → Escritorio → Calibrar zona de trabajo…**.
+3. Coloca el índice en el extremo **superior izquierdo de la imagen** que alcances cómodamente. Mantén aproximadamente un segundo y pulsa **Capturar** con mouse o teclado.
+4. Repite en el extremo **inferior derecho** y pulsa Capturar. Se estiman las esquinas con muestras recientes; si faltan datos o el área es muy pequeña, aparece un aviso.
+5. La segunda captura válida **guarda automáticamente** la zona y cierra el diálogo de calibración, pero Ajustes sigue abierto. Cierra Ajustes y pulsa **Activar** antes de comprobar que alcanzas los bordes sin forzar la mano. Cancelar en Ajustes no deshace esa calibración.
 
-```powershell
-.\venv\Scripts\Activate.ps1
-```
+La referencia es el video con tu espejo actual, no la posición final del cursor. No se generan acciones de mouse ni auxiliar durante la calibración. Usa luz uniforme, evita tapar el índice y deja solo la mano que usarás. Si cambias mucho la posición de cámara o cómo te sientas, vuelve a calibrar.
 
-Cuando se active correctamente, la terminal mostrará algo parecido a:
+## Prioridades y seguridad de los gestos
 
-```text
-(venv) PS C:\ruta\al\proyecto>
-```
+El programa no ejecuta todas las poses a la vez. Esta exclusividad evita, por ejemplo, pegar mientras arrastras con la principal.
 
-Si PowerShell bloquea la activación por la política de ejecución, abre PowerShell como usuario normal y ejecuta:
-
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-```
-
-Confirma con `Y` y vuelve a activar:
-
-```powershell
-.\venv\Scripts\Activate.ps1
-```
-
-No es necesario ejecutar PowerShell como administrador para esta configuración de usuario.
-
-### 5. Actualizar herramientas de instalación
-
-Con `venv` activado:
-
-```powershell
-python -m pip install --upgrade pip setuptools wheel
-```
-
-### 6. Instalar las dependencias
-
-Instala los paquetes usados por `control.py`:
-
-```powershell
-python -m pip install opencv-python numpy Pillow pynput mediapipe comtypes pycaw
-```
-
-La instalación puede tardar porque OpenCV y MediaPipe incluyen componentes binarios.
-
-### 7. Comprobar el intérprete y MediaPipe
-
-Ejecuta el diagnóstico incluido:
-
-```powershell
-python "import sys.py"
-```
-
-La salida esperada incluye una versión de Python, la ruta dentro de `venv` y un mensaje de que MediaPipe fue detectado correctamente.
-
-Comprueba que los paquetes principales pueden importarse:
-
-```powershell
-python -c "import cv2, numpy, PIL, pynput, mediapipe, comtypes, pycaw; print('Dependencias correctas')"
-```
-
-### 8. Conectar y comprobar la cámara
-
-Antes de iniciar:
-
-- Conecta una cámara web.
-- Cierra aplicaciones que puedan estar usando la cámara.
-- Permite el acceso de Python a la cámara si Windows muestra un aviso.
-- Coloca la mano frente a la cámara con iluminación suficiente.
-
-### 9. Iniciar el programa
-
-Con el entorno virtual activado, ejecuta:
-
-```powershell
-python control.py
-```
-
-Para detenerlo, cierra la ventana de la aplicación o interrumpe el proceso desde la terminal con `Ctrl+C`.
-
-## Ejecución
-
-Cada vez que abras una nueva terminal:
-
-```powershell
-cd "E:\Respaldo Luis\Bio-Gesture Control Pro"
-.\venv\Scripts\Activate.ps1
-python control.py
-```
-
-Si el proyecto está en otra ubicación, sustituye la ruta del primer comando.
-
-Para salir del entorno virtual cuando termines:
-
-```powershell
-deactivate
-```
-
-## Diagnóstico
-
-Si quieres verificar qué Python está usando VS Code o PowerShell:
-
-```powershell
-python "import sys.py"
-```
-
-También puedes consultar la ruta directamente:
-
-```powershell
-python -c "import sys; print(sys.executable)"
-```
-
-Debe apuntar a una ruta parecida a:
-
-```text
-...\Bio-Gesture Control Pro\venv\Scripts\python.exe
-```
-
-En VS Code, selecciona el intérprete con `Ctrl+Shift+P`, busca **Python: Select Interpreter** y elige el que esté dentro de `venv`.
+- Pausa, Ajustes, calibración, cambio de cámara y cierre bloquean a la auxiliar. Cerrar un diálogo no reactiva automáticamente.
+- Pinzas, clic/arrastre, menú, onda, scroll y volumen de la principal tienen prioridad. Para probar la auxiliar, deja la principal en seguimiento normal o retírala momentáneamente tras asignar roles.
+- Una auxiliar asignada puede actuar sin la principal visible si está activo y no permanece una operación incompatible.
+- Un gesto pendiente debe confirmarse de nuevo tras una interrupción. Una pinza auxiliar ejecutada conserva su bloqueo hasta una apertura reconocida: esconderla no sustituye abrirla.
+- Muestras antiguas o repetidas no acumulan tiempo para ejecutar. Perder seguimiento libera botones retenidos y cancela acciones pendientes; no se reproducen después como una cola atrasada.
+- En pausa quedan disponibles victoria para reanudar y onda para cambiar solo el modo de ventana. Con cámara apagada no se reconocen gestos.
+
+No dejes documentos importantes sin guardar durante las primeras pruebas. Bloquear sesión, Eliminar, Cortar o cerrar pestañas son acciones reales. El programa no se eleva como administrador ni maneja el escritorio seguro de Windows; aplicaciones con permisos superiores pueden rechazar sus entradas.
 
 ## Solución de problemas
 
-### `python` no se reconoce
+| Lo que observas | Qué revisar |
+| --- | --- |
+| El EXE no abre o faltan bibliotecas/recursos | Extrae la carpeta **completa**; conserva `_internal` al lado del EXE y comprueba que sea el paquete x64 esperado. No mezcles versiones |
+| Sigue sin arrancar | Conserva el mensaje y revisa diagnóstico. Un modelo/recurso ausente no se resuelve instalando Python global para el portable |
+| No hay cámara o imagen negra | Revisa índice, permisos de cámara para aplicaciones de escritorio en Windows y si otro programa usa el dispositivo. Prueba Apagar/Encender cámara y consulta Diagnóstico |
+| Hay cámara pero el cursor no se mueve | Comprueba Activar, cámara disponible, diálogos cerrados y principal elegida. Si empezaste con dos, usa Reelegir y deja visible una |
+| Tras guardar o calibrar no responde | Permanece pausado por diseño. Tras Guardar espera reconexión y elección de principal; cierra diálogos y activa |
+| Cursor invertido o sin alcanzar bordes | Revisa espejo, monitor e inversiones; calibra las dos esquinas de la imagen. Invertir cursor no cambia la L |
+| Los puntos no se dibujan | Marca Dibujar puntos de mano, guarda y espera muestras válidas. Funciona en vista limpia sin activar diagnóstico |
+| Veo puntos al actualizar pese a vista limpia | Se respeta tu preferencia marcada anterior. Desmárcala en Escritorio si quieres ocultarlos |
+| Auxiliar no copia ni desplaza | Verifica habilitación, rol asignado, pose continua 0.45 s y ausencia de gesto prioritario de la principal. Pausa también la bloquea |
+| Copiar/Pegar/Deshacer no hace lo esperado | Comprueba foco, selección y efecto de Ctrl+C/V/Z/Y en esa aplicación; Ctrl+Y no siempre es Rehacer |
+| Formo L pero no desplaza | Revisa **centro de palma** fuera de 45–55 %, otros tres dedos recogidos, foco y documento desplazable. No avanza más allá del extremo del documento |
+| L quieta sigue desplazando | Fuera del centro es lo previsto. Vuelve al centro, suelta la L o pausa para detenerla |
+| Una pinza no vuelve a ejecutar | Ábrela claramente. Sacar y meter la mano cerrada no demuestra una liberación |
+| Perdí detección durante arrastre | Se libera por seguridad. Abre antes de iniciar otro y comprueba el resultado en la aplicación |
+| La onda no cambia ventana | Haz cuatro recorridos alternados con tres dedos largos abiertos y altura estable, no un barrido. Usa Más como alternativa |
+| El radial selecciona mal o no repite | Parte del punto donde abriste el pulgar; mantén dirección 1 s y vuelve allí después de cada selección, también al cambiar de grupo |
+| Se pausa con una opción multimedia | Revisa perfil y compatibilidad en Diagnóstico. Subtítulos, por ejemplo, no está disponible en Global |
+| Oculté y sigue actuando | Ocultar no pausa: usa Ctrl+Alt+F12 o Pausar control en la bandeja |
+| Cámara ocupada estando pausado | La pausa conserva detección. Apagar cámara o Salir libera el dispositivo |
+| No encuentro ventana o hay otra instancia | Busca el ancla junto al reloj y Mostrar cámara; usa Ctrl+Alt+F12 si está disponible. No abras repetidamente más copias |
+| Una aplicación elevada/aviso de Windows no responde | No se controla el escritorio seguro ni se elevan permisos. Usa teclado/mouse; no desactives protecciones |
+| Retraso, temblor o mucho consumo | Revisa luz, tamaño visible de mano, resolución y FPS de detección. Ajusta suavizado gradualmente y compara Diagnóstico |
+| Aparece una consola | En portable abre el EXE, no BAT antiguos ni Python global. Para fuente usa el VBS local; `--console` es una opción expresa de desarrollo |
 
-Python no está en el PATH o la terminal se abrió antes de instalarlo. Cierra y abre PowerShell. Si sigue ocurriendo, prueba:
+Al informar un fallo, anota versión, resultado esperado/observado, perfil, cámara/resolución, pausa y si pertenece a principal o auxiliar. Comparte solo registros pertinentes después de revisarlos. No necesitas publicar fotografías personales para describirlo.
 
-```powershell
-py --version
-```
+## Actualizar, conservar ajustes y retirar el portable
 
-Si `py` funciona, usa `py` para crear el entorno y después ejecuta el Python de `venv`.
+### Actualizar sin mezclar archivos
 
-### `No module named cv2`, `mediapipe` u otro paquete
+1. Cierra Bio-Gesture desde **Salir** antes de cambiar de versión.
+2. Para una copia de seguridad, abre `%LOCALAPPDATA%\BioGestureControlPro` en el Explorador y copia `settings.json` a una ubicación elegida por ti.
+3. Extrae el nuevo ZIP en **otra carpeta completa**; no copies solo el EXE encima del anterior.
+4. Abre el nuevo EXE. Los ajustes válidos permanecen en el perfil de Windows, fuera del paquete: cámara, monitor, calibración, perfil y preferencias no dependen de la carpeta extraída.
+5. Revisa ajustes y prueba brevemente antes de retirar la carpeta antigua. Actualiza accesos directos que apunten al EXE anterior.
 
-Activa el entorno correcto y reinstala las dependencias:
+Se reconocen los formatos anteriores contemplados por esta versión; no se promete compatibilidad con cualquier versión futura o una vuelta arbitraria a antiguas. Si `settings.json` es inválido o incompatible, se usan valores iniciales y se registra el problema sin borrarlo al cargar. **Guardar sí escribe la configuración actual**: conserva primero una copia para investigar o recuperar la anterior.
 
-```powershell
-.\venv\Scripts\Activate.ps1
-python -m pip install opencv-python numpy Pillow pynput mediapipe comtypes pycaw
-```
+Cambiar de usuario de Windows puede cambiar qué ajustes están disponibles. La preferencia existente de Dibujar puntos de mano se respeta; desmarcada solo es el valor de ajustes nuevos. No ejecutes simultáneamente versiones distintas para comparar el mismo perfil.
 
-### MediaPipe no se instala o no se puede importar
+### Retirar el programa
 
-Comprueba la versión activa:
+1. Usa **Salir** y espera el cierre de cámara.
+2. Elimina la carpeta extraída y los accesos directos que creaste. No hay desinstalador formal porque no se instaló un servicio ni un producto mediante instalador.
+3. Ajustes y registros en `%LOCALAPPDATA%\BioGestureControlPro` **se conservan**. Solo si quieres borrar también preferencias, cierra todas las copias, respalda lo necesario y elimina expresamente esa carpeta de datos. Eso elimina calibración y registros, no únicamente el programa.
 
-```powershell
-python --version
-```
+No necesitas borrar Python ni otros programas del equipo para retirar el portable.
 
-Después actualiza pip e intenta de nuevo:
+## Privacidad, alcance y desarrollo
 
-```powershell
-python -m pip install --upgrade pip setuptools wheel
-python -m pip install mediapipe
-```
+El reconocimiento usa un modelo incluido y funciona localmente: el arranque normal no descarga modelos ni necesita un servicio de reconocimiento en la nube. No se graban fotos ni video en uso normal. Oculto sigue capturando para reconocer gestos; Apagar cámara o Salir termina la captura.
 
-La disponibilidad de MediaPipe puede variar según la versión de Python y la arquitectura de Windows. Se recomienda utilizar Python de 64 bits y una versión estable compatible con la versión actual de MediaPipe.
+La base 2.7 separa captura, detección, gestos, acciones e interfaz, procesa el cuadro reciente y adapta coordenadas a monitor y escala de Windows. Esto no garantiza un porcentaje de rendimiento ni elimina la prueba de luz, anatomía, oclusiones, falsas activaciones y comodidad en cada equipo.
 
-### La cámara no abre
+Las pruebas automáticas, imágenes sintéticas y un EXE sin Python en su ruta **no equivalen a una computadora recién instalada**. La validación física de dos manos, Windows 10/11 limpio, cámara, audio y aplicaciones reales sigue el registro de [Validación](docs/VALIDATION.md). La publicación de una descarga no implica un instalador firmado ni certificación para todos los equipos.
 
-El programa usa el índice `0`:
+Para desarrollar desde código sí se requiere **Python 3.12 x64**. Se conservan **PREPARAR_DESARROLLO.bat** para preparar el entorno e **INICIAR_CONTROL.vbs** para abrirlo sin consola una vez preparado. No forman parte del uso del portable; las instrucciones técnicas están en [Desarrollo](docs/DEVELOPMENT.md).
 
-```python
-cv2.VideoCapture(0, cv2.CAP_DSHOW)
-```
+### Referencias técnicas de 2.7
 
-Comprueba los permisos de cámara en **Configuración de Windows > Privacidad y seguridad > Cámara**. Cierra Zoom, Teams, OBS u otra aplicación que la esté usando. Si tienes varias cámaras, el índice podría necesitar cambiarse a `1` o `2`.
+- [Gestos, medidas y límites técnicos](docs/GESTURES.md)
+- [Arquitectura](docs/ARCHITECTURE.md)
+- [Fases y criterios de aceptación](docs/PHASES_1_4.md)
+- [Pruebas realizadas y pendientes](docs/VALIDATION.md)
+- [Distribución y comprobación del paquete](docs/DISTRIBUTION.md)
+- [Registro de capturas](docs/captures/README.md)
+- [Licencia](LICENSE) y [avisos de terceros](THIRD_PARTY_NOTICES.md)
 
-### La ventana aparece, pero la imagen está negra
+## Versión anterior e historia
 
-Verifica que la cámara funcione en la aplicación Cámara de Windows. También prueba conectar la cámara antes de ejecutar el programa y reiniciar la aplicación.
+La **serie 1.0, revisión 1.20.36**, permanece solo como referencia histórica. Sus requisitos, gestos y lanzadores antiguos no son las instrucciones de la 2.7.
 
-### El volumen no cambia
+- [README original 1.0, conservado sin modificaciones](legacy/v1.20.36/README.md).
+- [Código completo en su última revisión histórica](https://github.com/Luics415/Bio-Gesture-Control-Pro/tree/v1.20.36).
+- [Archivo del código de 1.20.36](https://github.com/Luics415/Bio-Gesture-Control-Pro/archive/refs/tags/v1.20.36.zip), para consulta; no es el portable actual.
+- [Revisión de desarrollo 2.0.0-dev.7](https://github.com/Luics415/Bio-Gesture-Control-Pro/releases/tag/v2.0.0-dev.7), antecedente de la numeración 2.7.
 
-El control depende de pycaw y del dispositivo de audio predeterminado de Windows. Si la inicialización de audio falla, el programa continúa sin control de volumen. Comprueba que haya un dispositivo de salida activo y que pycaw y comtypes estén instalados dentro de `venv`.
+Para usar el programa hoy, vuelve a la descarga 2.7 del principio. No necesitas instalar ni ejecutar primero la versión anterior.
 
-### Los gestos se activan solos
-
-Mejora la iluminación, aleja o acerca la mano hasta que se vea completa y evita fondos con mucho movimiento. El sistema usa umbrales geométricos y puede confundirse cuando los dedos se ocultan entre sí.
-
-### Los atajos se envían a la ventana equivocada
-
-`pynput` envía las teclas a la ventana que tenga el foco de Windows. Antes de seleccionar un comando del menú radial, asegúrate de que la aplicación destino sea la ventana activa.
-
-### `INICIAR_CONTROL.vbs` no inicia el programa
-
-El VBS actual intenta ejecutar `ACTIVAR_CAMARA.bat`, pero ese archivo no está presente en el proyecto. Usa el método directo:
-
-```powershell
-.\venv\Scripts\Activate.ps1
-python control.py
-```
-
-Si deseas automatizar el arranque, el archivo BAT debe crearse y configurarse para activar `venv` y ejecutar `control.py` desde la carpeta correcta.
-
-## Limitaciones y consideraciones
-
-- El sistema está orientado a Windows por el uso de `pycaw`, COM y teclas de Windows.
-- Solo se procesa una mano a la vez.
-- No existe una pantalla de configuración para cambiar umbrales, resolución o cámara.
-- El código asume una pantalla de referencia de `1920 x 1080` para transformar la posición del índice.
-- El control depende de una cámara con buena iluminación y una vista clara de la mano.
-- Algunos comandos del menú están reservados y todavía no tienen una acción implementada.
-- El control de teclas puede afectar cualquier aplicación que tenga el foco.
-- No se debe ejecutar el proyecto con privilegios elevados salvo que una necesidad concreta del sistema lo requiera.
-- `venv` no forma parte del código fuente y debe reconstruirse en cada equipo.
-
-## Flujo de uso recomendado
-
-1. Conecta la cámara.
-2. Abre PowerShell en la carpeta del proyecto.
-3. Activa `venv`.
-4. Ejecuta el diagnóstico si es la primera instalación.
-5. Inicia `control.py`.
-6. Espera a que la cámara muestre la mano.
-7. Prueba primero el movimiento del índice.
-8. Prueba clic izquierdo y derecho.
-9. Mantén el pulgar levantado para abrir el menú.
-10. Selecciona las opciones manteniendo el pulgar en la dirección deseada.
-11. Usa el gesto de victoria durante tres segundos para pausar el control.
-12. Cierra la ventana al finalizar y ejecuta `deactivate`.
-
-<img width="1600" height="863" alt="image" src="https://github.com/user-attachments/assets/0d8536b4-e642-4e40-bc3f-21a1ea202ff7" />
-
-
-## Licencia
-
-El código original de este proyecto se distribuye bajo la [Licencia MIT](LICENSE).
-
-Copyright (c) 2026 Luics415.
-
-La licencia MIT permite utilizar, copiar, modificar, publicar, distribuir y
-vender copias del código, siempre que se conserve el aviso de copyright y el
-texto de la licencia. El software se proporciona sin garantía.
-
-Esta licencia se aplica al código original de este repositorio. Las
-dependencias utilizadas por el proyecto, como OpenCV, MediaPipe, NumPy,
-Pillow, pynput, pycaw y comtypes, son proyectos independientes y mantienen
-sus propias licencias y avisos de copyright. Al redistribuir una instalación
-completa, revisa y conserva también los avisos exigidos por esas dependencias.
-Idea del proyecto completamente de Luics415
+⚓ **Desarrollado por Luics415**. El ancla y la firma visual siguen siendo la identidad del proyecto.

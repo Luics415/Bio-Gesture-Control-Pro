@@ -1,6 +1,19 @@
-# Validación — 2.0.0-dev.7
+# Validación — 2.7
 
-## Cámara sin texto y manual revisado — dev.7
+## Portada y numeración 2.7
+
+El autor solicita que 2.7 sea la presentación principal del repositorio, reconociendo las revisiones acumuladas hasta `2.0.0-dev.7`. Código y metadatos pasan a **2.7.0**; no se renumeran retrospectivamente las pruebas ni las entregas históricas. Esta transición no modifica motores de gestos, coordenadas, seguimiento, selección de manos ni preferencias del usuario.
+
+`README.md` es la guía actual con descargas separadas de portable y código, manual PDF e instrucciones de tres pasos. El README 1.0 se conserva byte por byte en `legacy/v1.20.36/README.md`; `README-2.0.md` es una referencia de compatibilidad. El splash cambia de 2.0 a 2.7 por autorización expresa, preservando el ancla y el texto de autor; su archivo anterior queda resguardado intacto. El manual usa la numeración actual y la nueva edición de la firma.
+
+- **924 pruebas aprobadas**, ninguna omitida, con Tk y MediaPipe habilitados (17.21 s): `output/validation-27/tests.xml`. Ruff y dependencias correctos. Dos advertencias conocidas de protobuf sobre Python 3.14; objetivo probado Python 3.12.10 x64 en Windows 10. Un primer intento limitado no pudo acceder a sus temporales por permisos del entorno; el pase completo con acceso adecuado terminó sin fallos. No se abrió la cámara ni se enviaron entradas reales.
+- Las pruebas nuevas comprueban coherencia de 2.7.0 en código/metadatos/recursos PE, portada con descargas separadas, guía anterior redirigida e integridad del README 1.0 y de ambas firmas. Motores y preferencias sin cambios respecto al commit `a03a75e`.
+- Manual de 17 páginas revisado visualmente por completo. Texto dentro de márgenes, 17 marcadores, seis enlaces internos y versión 2.7.0 presente en todas las páginas. Los píxeles de la firma incrustada coinciden con el recurso 2.7; no contiene capturas privadas.
+- La compilación debe comprobar el modelo/interfaz en ruta normal y con acentos, sin Python en PATH, y verificar copia del manual, manifiesto y ZIP. El `BUILD-MANIFEST.json` y SHA-256 de cada descarga son la evidencia del binario concreto; no se infiere de esta descripción.
+
+Sigue siendo una edición pública de pruebas, sin Authenticode ni certificación de Windows limpio. Los apartados siguientes conservan evidencia histórica de las revisiones de desarrollo.
+
+## Historial: cámara sin texto y manual revisado — dev.7
 
 Se eliminó la función de ayudas gestuales del dibujo de cámara, incluyendo textos y barras de espera. Los estados vacíos también limpian el lienzo sin escribir mensajes. Puntos/conexiones opcionales y menú radial permanecen. Fuente/VBS/EXE comienzan sin diagnóstico visual; `--diagnostics` solo muestra el pie externo, no instrucciones en el video. Se mantienen Ajustes, registros y diálogos de errores.
 

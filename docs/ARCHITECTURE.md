@@ -1,6 +1,6 @@
-# Arquitectura de desarrollo 2.0
+# Arquitectura 2.7
 
-La versión **2.0.0-dev.5** separa la cámara y la inferencia del hilo gráfico. El selector asigna las muestras a principal y auxiliar; sus motores transforman coordenadas en eventos descriptivos. Solo el adaptador de Windows produce acciones reales. Las pruebas pueden recorrer esos mismos estados sin tocar mouse, teclado o cámara.
+La versión **2.7.0**, basada en el núcleo validado durante el desarrollo 2.0, separa la cámara y la inferencia del hilo gráfico. El selector asigna las muestras a principal y auxiliar; sus motores transforman coordenadas en eventos descriptivos. Solo el adaptador de Windows produce acciones reales. Las pruebas pueden recorrer esos mismos estados sin tocar mouse, teclado o cámara.
 
 ```text
 Cámara → último cuadro → MediaPipe → asignación de roles
@@ -49,7 +49,7 @@ La pausa de acciones conserva seguimiento para reconocer victoria y la onda late
 
 Ocultar la ventana conserva el trabajo en segundo plano, pero omite crear imágenes y dibujar video mientras no sea visible. **Más → Apagar cámara** libera el dispositivo; salir cierra el seguimiento. La distribución de pruebas es barra de 28 píxeles, cámara de 335 y estado de 12. La barra muestra Activar/Pausar, Ajustes y Más; el modo fijo conserva el tamaño, elimina bordes y usa opacidad inicial de 85%.
 
-Desde dev.7 la zona de cámara no crea instrucciones, contadores, mensajes de espera/error ni barras auxiliares, tampoco con `--diagnostics`. Solo contiene la imagen, puntos/conexiones opcionales y el menú radial cuando se utiliza. **Dibujar puntos de mano** decide siempre si se dibujan ambas manos; se respeta una preferencia guardada. Fuente, VBS y EXE comienzan sin diagnóstico visual. `--diagnostics` permite consultar el pie externo de desarrollo, nunca reintroduce textos en la cámara. Ajustes, registros, controles y diálogos de fallos de arranque siguen disponibles. El splash aprobado no cambia.
+Desde dev.7 la zona de cámara no crea instrucciones, contadores, mensajes de espera/error ni barras auxiliares, tampoco con `--diagnostics`. Solo contiene la imagen, puntos/conexiones opcionales y el menú radial cuando se utiliza. **Dibujar puntos de mano** decide siempre si se dibujan ambas manos; se respeta una preferencia guardada. Fuente, VBS y EXE comienzan sin diagnóstico visual. `--diagnostics` permite consultar el pie externo de desarrollo, nunca reintroduce textos en la cámara. Ajustes, registros, controles y diálogos de fallos de arranque siguen disponibles. El splash conserva el diseño aprobado con la actualización de número a 2.7 solicitada por el autor.
 
 ## Coordenadas
 

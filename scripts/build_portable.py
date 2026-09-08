@@ -24,7 +24,7 @@ APP_NAME = "BioGestureControlPro"
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_SHA256 = "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1"
 BUILD_TOOLS = {"pyinstaller": "6.22.2", "pyinstaller-hooks-contrib": "2026.7"}
-PUBLIC_FILES = ("README-2.0.md", "README.md", "LICENSE", "THIRD_PARTY_NOTICES.md",
+PUBLIC_FILES = ("README.md", "README-2.0.md", "legacy/v1.20.36/README.md", "LICENSE", "THIRD_PARTY_NOTICES.md",
                 "docs/GESTURES.md", "docs/ARCHITECTURE.md", "docs/PHASES_1_4.md", "docs/DEVELOPMENT.md",
                 "docs/DISTRIBUTION.md", "docs/VALIDATION.md", "docs/captures/README.md")
 PUBLIC_ASSET_MAP = {"docs/manual/Manual-de-usuario.pdf": "Manual-de-usuario.pdf"}

@@ -1,6 +1,6 @@
-# Estado del proyecto 2.0 · fases 1–7
+# Estado del proyecto 2.7 · fases 1–7
 
-Versión: **2.0.0-dev.7**. Las fases 1–5 tienen implementación local. Esta revisión elimina definitivamente los textos de la zona de cámara, mejora las manos ilustradas del manual y añade la firma aprobada al final. Mantiene las correcciones dev.6 de puntos opcionales y L. La publicación del código/manual/portable de pruebas no sustituye la sesión física ni Windows limpio. La identidad de ancla se conserva sin rediseñar los recursos aprobados; el texto del splash es exactamente **Desarrollado por Luics415**. No se presenta como un rediseño completo de ventana aprobado.
+Versión: **2.7.0** (presentación pública **2.7**), continuidad de `2.0.0-dev.7`. Las fases 1–5 tienen implementación local. Esta revisión elimina definitivamente los textos de la zona de cámara, mejora las manos ilustradas del manual y añade la firma aprobada al final. Mantiene las correcciones dev.6 de puntos opcionales y L. La publicación del código/manual/portable de pruebas no sustituye la sesión física ni Windows limpio. La identidad de ancla se conserva; el único cambio solicitado en el splash es el número 2.0 → 2.7; el texto del splash es exactamente **Desarrollado por Luics415**. No se presenta como un rediseño completo de ventana aprobado.
 
 ## Alcance
 
@@ -24,7 +24,7 @@ Se incorpora además la **L auxiliar** —pulgar e índice abiertos aproximadame
 
 Pinzas/clics, arrastre, menú, onda, scroll y volumen de la principal tienen prioridad; pausa, configuración, calibración y cambio de cámara también bloquean las acciones auxiliares. La auxiliar asignada puede actuar cuando la principal sale momentáneamente de cámara, sin una operación incompatible. Modificadores Ctrl/Mayús sostenidos mediante gestos y otras ampliaciones quedan pospuestos.
 
-La ventana mantiene 550×375: barra de 28 píxeles con **Activar/Pausar**, **Ajustes** y **Más**, cámara de 335 y franja inferior de 12; las métricas se consultan en Diagnóstico. El radial muestra ocho etiquetas cortas y una barra horizontal. En dev.7 se elimina el dibujo de todas las instrucciones, contadores de onda y avisos dentro de cámara, en fuente, VBS y EXE, incluso con diagnóstico explícito. **Dibujar puntos de mano** sigue siendo opcional y respeta la preferencia guardada. El inicio habitual no muestra estado de desarrollo; `--diagnostics` habilita solo el pie externo. Controles, Ajustes y diálogos de fallo siguen disponibles; el ancla y splash permanecen intactos.
+La ventana mantiene 550×375: barra de 28 píxeles con **Activar/Pausar**, **Ajustes** y **Más**, cámara de 335 y franja inferior de 12; las métricas se consultan en Diagnóstico. El radial muestra ocho etiquetas cortas y una barra horizontal. En dev.7 se elimina el dibujo de todas las instrucciones, contadores de onda y avisos dentro de cámara, en fuente, VBS y EXE, incluso con diagnóstico explícito. **Dibujar puntos de mano** sigue siendo opcional y respeta la preferencia guardada. El inicio habitual no muestra estado de desarrollo; `--diagnostics` habilita solo el pie externo. Controles, Ajustes y diálogos de fallo siguen disponibles; el ancla permanece intacta y el splash lleva la numeración 2.7.
 
 El inicio de desarrollo es **INICIAR_CONTROL.vbs** después de preparar `.venv`. La distribución portable utiliza directamente **BioGestureControlPro.exe** con toda su carpeta. El estado verificable del paquete figura en [Distribución](DISTRIBUTION.md) y [Validación](VALIDATION.md); no equivale a un instalador firmado.
 
@@ -55,13 +55,13 @@ La frecuencia real depende del equipo y la cámara; no se promete 30 o 60 FPS po
 
 - **Fase 5, implementación local:** dos roles, cuatro pinzas de edición cotidiana y desplazamiento auxiliar en L; completar refinamiento y validación. Ambos roles pueden corresponder a cualquiera de las manos del mismo usuario. La auxiliar está inicialmente habilitada y se controla desde Ajustes o Más; no se afirma implementado un gesto adicional de autorización. Ctrl/Mayús sostenidos y otros gestos quedan pospuestos.
 - **Fase 6, automatización avanzada:** pruebas unitarias e integradas, geometría Tk, modelo real sobre cuadros sintéticos y pruebas sin entradas. Queda la aceptación física de esta revisión, incluidas oclusiones y cruces de dos manos; no se marca completa con pruebas sintéticas.
-- **Fase 7, empaquetado en curso:** portable sin Python externo, verificación del modelo incluido y SHA-256. Quedan pruebas en Windows limpio, instalador con accesos/desinstalador, firma digital y publicación verificable; requieren evidencias y, para firma/publicación, las decisiones correspondientes.
+- **Fase 7, empaquetado en curso:** portable sin Python externo, verificación del modelo incluido y SHA-256. El código, PDF y portable de pruebas se publican en GitHub; el estado de cada descarga se verifica por separado. Quedan Windows limpio, instalador con accesos/desinstalador y firma digital.
 
-La firma visual de autor del splash ya es parte del diseño. La firma digital de Windows es un proceso diferente y corresponde a fase 7; esta versión de desarrollo no se presenta como un ejecutable firmado ni como una Release publicada.
+La firma visual de autor del splash ya es parte del diseño. La firma digital de Windows es un proceso diferente y corresponde a fase 7; esta edición pública de pruebas no se presenta como un ejecutable firmado ni una versión final certificada.
 
 ## Documentación y limpieza
 
-El README publicado de 1.0 se conserva byte por byte, sin añadirle enlaces. La extensión es `README-2.0.md`, también utilizada como descripción del paquete. Una prueba fija el hash del original y otra protege el splash aprobado.
+El README publicado de 1.0 se conserva byte por byte en `legacy/v1.20.36/README.md`, sin añadirle enlaces. La portada y descripción del paquete pasan a `README.md`, dedicadas a 2.7 con descarga del portable y PDF. `README-2.0.md` solo conserva referencias hacia la guía vigente y su revisión histórica. Las pruebas protegen el original y ambas versiones del splash.
 
 Se elimina el BAT de compatibilidad redundante de la raíz; se mantienen VBS, herramientas de desarrollo y el respaldo histórico. El portable debe excluir entornos virtuales, pruebas, cachés y registros personales. No se borra `venv` antiguo ni la configuración del usuario durante esta limpieza.
 

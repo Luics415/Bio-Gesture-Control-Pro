@@ -21,7 +21,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from biogesture import AUTHOR, __version__  # noqa: E402 - standalone document entry point
 
-OUT = ROOT / "output/pdf/Bio-Gesture-Control-Pro-2.0-Manual-de-usuario.pdf"
+VERSION_LABEL = ".".join(__version__.split(".")[:2])
+OUT = ROOT / f"output/pdf/Bio-Gesture-Control-Pro-{VERSION_LABEL}-Manual-de-usuario.pdf"
 W, H = A4
 PAGE_COUNT = 17
 M = 43
@@ -160,7 +161,7 @@ def cover():
     C.setFont("UI-Bold", 30)
     C.drawCentredString(W / 2, H - 335, "Bio-Gesture Control Pro")
     C.setFont("UI", 25)
-    C.drawCentredString(W / 2, H - 375, "Manual de usuario · 2.0")
+    C.drawCentredString(W / 2, H - 375, f"Manual de usuario · {VERSION_LABEL}")
     C.setFillColor(colors.HexColor("#79d8dc"))
     C.setFont("UI", 13)
     C.drawCentredString(W / 2, H - 420, "Tu escritorio, con una mano principal y una auxiliar")
@@ -438,7 +439,7 @@ def troubleshooting():
     y = table(["Qué notas", "Qué revisar"], [
         ("No aparece la imagen", "Comprueba cámara, índice elegido y permisos de Windows. Cierra otra aplicación que la esté usando. Apaga/enciende cámara desde Más."),
         ("Se ve la mano, pero no hay control", "¿Está pausado? ¿Hay Ajustes/calibración abiertos? Al iniciar deja una sola mano visible para elegir la principal; luego pulsa Activar."),
-        ("No aparecen los puntos", "Marca Dibujar puntos de mano y pulsa Guardar. Debe haber detección válida. En dev.6 la vista limpia ya no anula esa casilla."),
+        ("No aparecen los puntos", "Marca Dibujar puntos de mano y pulsa Guardar. Debe haber detección válida. La vista limpia no anula esa casilla."),
         ("La L no desplaza", "Usa la auxiliar; confirma sus comandos habilitados. Dobla los otros tres dedos. Mueve el centro de la palma claramente fuera de la banda central, mantén la pose y comprueba que la principal no esté haciendo otro gesto."),
         ("La L parece cambiar de sentido", "La dirección depende de la palma respecto a la imagen, no del índice ni de la pantalla. En el centro se detiene. Prueba arriba y abajo con una separación clara."),
         ("Copiar/Pegar va al lugar equivocado", "Selecciona antes la ventana destino. Comprueba selección, portapapeles y atajos de esa aplicación."),
@@ -462,7 +463,7 @@ def care():
     for item in ["Imagen estable y manos completas, con luz uniforme.", "Principal elegida; cursor, clics y pausa comprobados.",
                  "Auxiliar: una ejecución por pinza; L arriba, centro y abajo.", "Onda de cuatro recorridos, bandeja y salida correcta."]:
         y = paragraph("<b>□</b> " + item, M + 5, y, CW - 5)
-    y = paragraph("Referencia: código y README 2 de esta revisión, además de tus dos capturas para analizar la L. Los esquemas orientan; no prometen precisión universal. Descansa si notas tensión en brazos o manos y alterna con teclado/mouse.", M, y - 4, style="small")
+    y = paragraph("Referencia: código y README de esta revisión, además de tus dos capturas para analizar la L. Los esquemas orientan; no prometen precisión universal. Descansa si notas tensión en brazos o manos y alterna con teclado/mouse.", M, y - 4, style="small")
     label("Gracias por usar Bio-Gesture. El ancla permanece.", M, y - 5, 11, TEAL, True)
 
 
@@ -477,7 +478,7 @@ def author_signature():
     C.setFillColor(colors.white)
     C.setFont("UI-Bold", 26)
     C.drawCentredString(W / 2, H - 163, "El ancla es nuestra identidad")
-    # Place the exact approved signature, uncropped and without modification.
+    # Place the author-approved 2.7 version edit, uncropped.
     signature_width = W - 40
     signature_height = signature_width * 2 / 3
     C.drawImage(str(ROOT / "assets/brand/splash-author.png"), 20, H / 2 - signature_height / 2 - 10,
@@ -497,7 +498,7 @@ def main():
     init_fonts()
     OUT.parent.mkdir(parents=True, exist_ok=True)
     C = canvas.Canvas(str(OUT), pagesize=A4, pageCompression=1)
-    C.setTitle("Bio-Gesture Control Pro 2.0 - Manual de usuario")
+    C.setTitle(f"Bio-Gesture Control Pro {VERSION_LABEL} - Manual de usuario")
     C.setAuthor("Luics415")
     C.setCreator("Bio-Gesture Control Pro - Documentación")
     C.setSubject(f"Guía visual de uso, {__version__}; esquemas originales, sin capturas personales")

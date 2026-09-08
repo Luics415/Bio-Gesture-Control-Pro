@@ -1,6 +1,6 @@
-# Distribución 2.0 · Windows x64
+# Distribución 2.7 · Windows x64
 
-La distribución de **2.0.0-dev.7** es **portable en carpeta**, sin consola y sin Python instalado por separado. No es un EXE suelto ni un instalador firmado. Compilar un paquete no lo publica automáticamente; el estado de publicación se verifica por separado. El resultado concreto de cada compilación queda en su `BUILD-MANIFEST.json` y su archivo `.zip.sha256`.
+La distribución de **2.7.0** es **portable en carpeta**, sin consola y sin Python instalado por separado. No es un EXE suelto ni un instalador firmado. Compilar un paquete no lo publica automáticamente; el estado de publicación se verifica por separado. El resultado concreto de cada compilación queda en su `BUILD-MANIFEST.json` y su archivo `.zip.sha256`.
 
 ## Para usar el paquete
 
@@ -9,7 +9,7 @@ La distribución de **2.0.0-dev.7** es **portable en carpeta**, sin consola y si
 3. Configurar cámara/monitor y activar el control desde su inicio pausado.
 4. Cerrar desde Más o la bandeja antes de mover o retirar la carpeta.
 
-El manual ilustrado de **17 páginas** está junto al ejecutable como **Manual-de-usuario.pdf**, con diagramas y la firma aprobada al final. No necesita Python ni conexión para abrirse en un lector PDF. El README 2.0 incluye además la guía completa de gestos, perfiles y ajustes; el README original permanece como referencia histórica.
+El manual ilustrado de **17 páginas** está junto al ejecutable como **Manual-de-usuario.pdf**, con diagramas y la firma aprobada al final. No necesita Python ni conexión para abrirse en un lector PDF. El README principal incluye la guía completa de gestos, perfiles y ajustes. El original 1.0 queda en `legacy/v1.20.36/README.md`, solo como referencia histórica.
 
 No requiere BAT, VBS, Python, Git ni descargas de modelo al arrancar. No instala servicios ni añade inicio automático. Dentro de la cámara solo se dibujan el video, los puntos opcionales y el radial: no hay mensajes ni ayudas, tampoco con `--diagnostics` o desde el código. Los diagnósticos se consultan en Ajustes. Los datos del usuario están fuera del paquete, en `%LOCALAPPDATA%\BioGestureControlPro`.
 
@@ -21,9 +21,9 @@ Para retirar el portable basta cerrar la aplicación y eliminar la carpeta extra
 
 Requiere el entorno de desarrollo del proyecto, Python 3.12 x64 con Tcl/Tk y Windows x64. Las versiones del compilador y sus dependencias están bloqueadas con hashes, conservando el bloqueo de ejecución.
 
-El manual aprobado se versiona en **docs/manual/Manual-de-usuario.pdf**, de modo que existe también en una copia completa del repositorio y el enlace del README 2.0 funciona sin archivos locales ignorados. Compilar utiliza esa copia; no es necesario regenerarla si no has cambiado el manual. Si falta, su cabecera no corresponde a PDF o está incompleto, la comprobación se detiene antes de compilar. Comprobar su formato y sus hashes no sustituye revisar visualmente las páginas.
+El manual aprobado se versiona en **docs/manual/Manual-de-usuario.pdf**, de modo que existe también en una copia completa del repositorio y el enlace del README principal funciona sin archivos locales ignorados. Compilar utiliza esa copia; no es necesario regenerarla si no has cambiado el manual. Si falta, su cabecera no corresponde a PDF o está incompleto, la comprobación se detiene antes de compilar. Comprobar su formato y sus hashes no sustituye revisar visualmente las páginas.
 
-Para actualizar el manual, desde la raíz del proyecto usa un **Python de documentos separado**, con ReportLab disponible. **scripts/create_user_manual.py** utiliza los dibujos de **scripts/manual_hands.py** y genera **output/pdf/Bio-Gesture-Control-Pro-2.0-Manual-de-usuario.pdf** como borrador local. Sustituye la ruta ilustrativa por la de ese intérprete; no es el Python del portable ni obliga a instalar ReportLab en la `.venv` de la aplicación:
+Para actualizar el manual, desde la raíz del proyecto usa un **Python de documentos separado**, con ReportLab disponible. **scripts/create_user_manual.py** utiliza los dibujos de **scripts/manual_hands.py** y genera **output/pdf/Bio-Gesture-Control-Pro-2.7-Manual-de-usuario.pdf** como borrador local. Sustituye la ruta ilustrativa por la de ese intérprete; no es el Python del portable ni obliga a instalar ReportLab en la `.venv` de la aplicación:
 
 ```powershell
 & 'C:\ruta\al\entorno-documentos\Scripts\python.exe' .\scripts\create_user_manual.py
@@ -45,9 +45,10 @@ dist/
     BioGestureControlPro/
       BioGestureControlPro.exe
       _internal/
-      README-2.0.md
+      README-2.0.md             Referencia hacia la guía actual
       Manual-de-usuario.pdf     Manual ilustrado local
-      README.md                 Histórico 1.0 intacto
+      README.md                 Guía actual 2.7
+      legacy/v1.20.36/README.md  Histórico 1.0 intacto
       docs/                     Documentación pública seleccionada
       BUILD-MANIFEST.json
   BioGestureControlPro-<version>-windows-x64-<fecha>.zip

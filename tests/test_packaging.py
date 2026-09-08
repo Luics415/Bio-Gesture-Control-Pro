@@ -51,6 +51,7 @@ def fake_bundle(tmp_path):
 
 @pytest.mark.parametrize(("version", "expected"), [
     ("2.0.0-dev.5", (2, 0, 0, 5)), ("2.0.0.dev5", (2, 0, 0, 5)), ("2.1.3", (2, 1, 3, 0)),
+    ("2.7.0", (2, 7, 0, 0)),
 ])
 def test_version_resource_is_derived_from_source(version, expected):
     assert portable.numeric_version(version) == expected
@@ -85,6 +86,7 @@ def test_valid_bundle_has_python_tk_approved_assets_and_public_docs(tmp_path):
     assert portable.validate_bundle(bundle, root)
     assert "README-2.0.md" in portable.PUBLIC_FILES
     assert "README.md" in portable.PUBLIC_FILES
+    assert "legacy/v1.20.36/README.md" in portable.PUBLIC_FILES
     assert not any(name.lower().endswith((".bat", ".png")) for name in portable.PUBLIC_FILES)
     assert portable.PUBLIC_ASSET_MAP == {
         "docs/manual/Manual-de-usuario.pdf": "Manual-de-usuario.pdf"}
