@@ -508,10 +508,16 @@ def test_target_draw_uses_monitor_local_coordinates_with_no_camera_overlay():
     ]
 
 
-def test_target_colors_and_black_ring():
-    assert len(CALIBRATION_TARGET_COLORS) == 7
-    # 5th color (index 4) is white for high contrast over neutral gray background
-    assert CALIBRATION_TARGET_COLORS[4] == "#ffffff"
+def test_target_colors_and_palette_ring():
+    assert len(CALIBRATION_TARGET_COLORS) == 6
+    assert CALIBRATION_TARGET_COLORS == (
+        "#ef4444",  # rojo
+        "#facc15",  # amarillo
+        "#22c55e",  # verde
+        "#3b82f6",  # azul
+        "#a855f7",  # morado
+        "#ec4899",  # rosa
+    )
     dialog = bare_dialog()
     dialog._paint = GazeCalibrationDialog._paint.__get__(dialog)
     dialog._painted = None
@@ -519,11 +525,23 @@ def test_target_colors_and_black_ring():
     dialog.start_button = Mock()
     dialog.monitor = RectMonitor("main", "Principal", 0, 0, 1920, 1080)
     dialog.collector.start(10)
-    dialog.collector.point_index = 4
+    dialog.collector.point_index = 0
+    # Neutral mode: outer ring is black (#000000)
+    dialog._palette_name = "neutral"
     dialog._paint()
     calls = dialog.canvas.create_oval.call_args_list
     assert calls[0][1]["outline"] == "#000000"
-    assert calls[1][1]["fill"] == "#ffffff"
+    assert calls[1][1]["fill"] == "#ef4444"
+
+    # Dark mode (fondo gris oscuro): outer ring is white (#ffffff)
+    dialog.collector.start(10)
+    dialog._palette_name = "dark"
+    dialog._painted = None
+    dialog.canvas.create_oval.reset_mock()
+    dialog._paint()
+    calls = dialog.canvas.create_oval.call_args_list
+    assert calls[0][1]["outline"] == "#ffffff"
+    assert calls[1][1]["fill"] == "#ef4444"
 
 
 
