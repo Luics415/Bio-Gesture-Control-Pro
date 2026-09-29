@@ -1,0 +1,4 @@
+# Motor ocular opcional. Instalar DESPUÉS del entorno base, sin sustituir NumPy/MediaPipe.
+# Runtime fijado para CPython 3.12 Windows x64. No afecta al modo índice.
+openvino==2024.6.0
+openvino-telemetry==2025.2.0

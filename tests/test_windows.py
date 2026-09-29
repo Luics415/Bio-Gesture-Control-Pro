@@ -85,6 +85,48 @@ class WindowsActionTests(unittest.TestCase):
         native.key.assert_any_call("win", True)
         native.key.assert_any_call("s", True)
 
+    def test_task_view_sends_and_releases_win_tab_for_both_command_routes(self):
+        for kind in ("command", "auxiliary_command"):
+            with self.subTest(kind=kind):
+                native = Mock()
+                actions = WindowsActions(_native=native)
+                self.assertTrue(actions.handle(ActionEvent(kind, "VISTA_TAREAS")))
+                self.assertEqual(native.key.call_args_list,
+                                 [(("win", True),), (("tab", True),),
+                                  (("tab", False),), (("win", False),)])
+                self.assertFalse(actions._held_keys)
+
+    def test_auxiliary_task_view_is_independent_of_primary_profile_shortcuts(self):
+        native = Mock()
+        actions = WindowsActions(_native=native, shortcuts={"VS Code": {"VISTA_TAREAS": ("ctrl", "t")}})
+        actions.set_profile("VS Code")
+        self.assertTrue(actions.handle(ActionEvent("auxiliary_command", "VISTA_TAREAS")))
+        self.assertEqual(native.key.call_args_list,
+                         [(("win", True),), (("tab", True),),
+                          (("tab", False),), (("win", False),)])
+
+    def test_task_view_failure_releases_windows_modifier(self):
+        native = Mock()
+
+        def key(name, down):
+            if name == "tab" and down:
+                raise OSError("task view blocked")
+
+        native.key.side_effect = key
+        actions = WindowsActions(_native=native)
+        with self.assertLogs(level="ERROR"):
+            self.assertFalse(actions.handle(ActionEvent("auxiliary_command", "VISTA_TAREAS")))
+        native.key.assert_any_call("tab", False)
+        native.key.assert_any_call("win", False)
+        self.assertFalse(actions._held_keys)
+
+    def test_task_view_dry_run_never_initializes_native_input(self):
+        with patch("biogesture.windows._NativeInput") as native:
+            actions = WindowsActions(dry_run=True)
+            self.assertTrue(actions.handle(ActionEvent("auxiliary_command", "VISTA_TAREAS")))
+            self.assertFalse(actions._held_keys)
+            native.assert_not_called()
+
     def test_profile_shortcuts_are_validated_and_apply(self):
         native = Mock()
         with self.assertRaises(ValueError):

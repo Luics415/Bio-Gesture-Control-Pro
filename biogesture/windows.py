@@ -35,6 +35,7 @@ GLOBAL_SHORTCUTS = {
     "VOL+": ("volume_up",), "VOL-": ("volume_down",),
     "GUARDAR": ("ctrl", "s"), "GUARDAR TODO": ("ctrl", "shift", "s"),
     "SIGUIENTE T": ("ctrl", "tab"), "ANTERIOR T": ("ctrl", "shift", "tab"),
+    "VISTA_TAREAS": ("win", "tab"),
 }
 PROFILE_SHORTCUTS = {
     "Global": {},
@@ -47,11 +48,12 @@ PROFILE_SHORTCUTS = {
                    "FULLSCREEN": ("f",), "SUBTITULOS": ("c",)},
 }
 
-# Everyday auxiliary editing, independent of the principal hand's profile.
+# Everyday auxiliary commands, independent of the principal hand's profile.
 # Applications decide what their current selection and undo history mean.
 AUXILIARY_SHORTCUTS = {
     "COPIAR": ("ctrl", "c"), "PEGAR": ("ctrl", "v"),
     "DESHACER": ("ctrl", "z"), "REHACER": ("ctrl", "y"),
+    "VISTA_TAREAS": ("win", "tab"),
 }
 
 

@@ -19,6 +19,29 @@ def samples(x=0.2, y=0.2, hand="Right"):
     return [HandSample(10 + i * 0.1, (Landmark(x, y),) * 21, handedness=hand) for i in range(11)]
 
 
+def settings_tab(notebook, name):
+    """Find the visible tab name, not an index that shifts when tabs are added."""
+    path = next(path for path in notebook.tabs() if notebook.tab(path, "text") == name)
+    return notebook.nametowidget(path)
+
+
+def settings_notebook(dialog):
+    return next(widget for child in dialog.winfo_children()
+                for nested in child.winfo_children() for widget in nested.winfo_children()
+                if widget.winfo_class() == "TNotebook")
+
+
+def settings_control(tab, label):
+    caption = next(widget for widget in tab.winfo_children()
+                   if widget.winfo_class() == "TLabel" and widget.cget("text") == label)
+    return tab.grid_slaves(row=caption.grid_info()["row"], column=1)[0]
+
+
+def settings_save(dialog):
+    return next(widget for child in dialog.winfo_children() for widget in child.winfo_children()
+                if widget.winfo_class() == "TButton" and widget.cget("text") == "Guardar")
+
+
 def test_virtual_desktop_preserves_negative_origins_and_gaps():
     monitors = [RectMonitor("left", "Izquierda", -1920, -100, 1920, 1080),
                 RectMonitor("main", "Principal", 0, 0, 2560, 1440, True)]
@@ -465,9 +488,9 @@ def test_landmark_checkbox_applies_persists_and_reopens_independently_of_diagnos
         notebook = next(widget for child in dialog.winfo_children()
                         for nested in child.winfo_children() for widget in nested.winfo_children()
                         if widget.winfo_class() == "TNotebook")
-        notebook.select(2)
+        tab = settings_tab(notebook, "Escritorio")
+        notebook.select(tab)
         app.root.update()
-        tab = app.root.nametowidget(notebook.tabs()[2])
         label = next(widget for widget in tab.winfo_children()
                      if widget.winfo_class() == "TLabel" and widget.cget("text") == "Dibujar puntos de mano")
         return tab.grid_slaves(row=label.grid_info()["row"], column=1)[0]
@@ -505,7 +528,7 @@ def test_landmark_checkbox_applies_persists_and_reopens_independently_of_diagnos
             assert app.settings.show_landmarks is enabled
             assert Settings.load(target).show_landmarks is enabled
             assert vars(app.settings) == {**before, "show_landmarks": enabled}
-            app._restart_camera.assert_called_once_with(True)
+            app._restart_camera.assert_not_called()
             assert app.diagnostic_visuals is diagnostic_visuals
             assert bool(footer.winfo_children()) is diagnostic_visuals
 
@@ -614,23 +637,23 @@ def test_tk_layout_fits_fixed_window_and_dialogs_at_multiple_dpi(scaling, diagno
         notebook = next(widget for child in dialog.winfo_children()
                         for nested in child.winfo_children() for widget in nested.winfo_children()
                         if widget.winfo_class() == "TNotebook")
-        notebook.select(3)
+        diagnostics = settings_tab(notebook, "Diagnóstico")
+        notebook.select(diagnostics)
         root.update()
         assert app._diagnostics_visible
-        diagnostics = root.nametowidget(notebook.tabs()[3])
         assert any(widget.winfo_class() == "TLabel" and str(widget.cget("textvariable")) == str(app.status)
                    for widget in diagnostics.winfo_children())
         diagnostics_text = " ".join(widget.cget("text") for widget in diagnostics.winfo_children()
                                     if widget.winfo_class() == "TLabel")
         assert all(command in diagnostics_text for command in ("copiar", "pegar", "deshacer", "rehacer"))
         assert "0.45 s" in diagnostics_text
-        desktop_tab = root.nametowidget(notebook.tabs()[2])
+        desktop_tab = settings_tab(notebook, "Escritorio")
         auxiliary_label = next(widget for widget in desktop_tab.winfo_children()
                                if widget.winfo_class() == "TLabel" and widget.cget("text") == "Comandos de mano auxiliar")
         auxiliary_control = desktop_tab.grid_slaves(row=auxiliary_label.grid_info()["row"], column=1)[0]
         assert auxiliary_control.winfo_class() == "TCheckbutton"
         assert auxiliary_control.instate(["selected"])
-        notebook.select(0)
+        notebook.select(settings_tab(notebook, "Cámara"))
         root.update()
         assert not app._diagnostics_visible
         assert dialog.winfo_width() <= root.winfo_screenwidth()
@@ -653,7 +676,7 @@ def test_tk_layout_fits_fixed_window_and_dialogs_at_multiple_dpi(scaling, diagno
         notebook = next(widget for child in dialog.winfo_children()
                         for nested in child.winfo_children() for widget in nested.winfo_children()
                         if widget.winfo_class() == "TNotebook")
-        desktop_tab = root.nametowidget(notebook.tabs()[2])
+        desktop_tab = settings_tab(notebook, "Escritorio")
         auxiliary_label = next(widget for widget in desktop_tab.winfo_children()
                                if widget.winfo_class() == "TLabel" and widget.cget("text") == "Comandos de mano auxiliar")
         desktop_tab.grid_slaves(row=auxiliary_label.grid_info()["row"], column=1)[0].invoke()
@@ -665,7 +688,7 @@ def test_tk_layout_fits_fixed_window_and_dialogs_at_multiple_dpi(scaling, diagno
         assert not app.settings.auxiliary_enabled
         assert app.engine.settings is app.settings and app.auxiliary_engine.settings is app.settings
         assert app.engine.paused
-        factory.assert_called_once()
+        factory.assert_not_called()
         factory.return_value.start.assert_not_called()
         save_settings.assert_not_called()
         assert not callback_errors
@@ -673,3 +696,200 @@ def test_tk_layout_fits_fixed_window_and_dialogs_at_multiple_dpi(scaling, diagno
     finally:
         app.request_close()
         app.tick()
+
+
+@pytest.fixture
+def real_control_settings_app(tmp_path, monkeypatch):
+    """Real controls and persistence; no camera, hooks, tray or native input."""
+    import tkinter as tk
+
+    from biogesture.gestures import GestureEngine
+    from biogesture.windows import WindowsActions
+
+    monkeypatch.setenv("BIOGESTURE_DATA_DIR", str(tmp_path))
+    factory = Mock(side_effect=AssertionError("The settings test cannot create a camera"))
+    monkeypatch.setattr("biogesture.desktop.TrackingPipeline", factory)
+    root = tk.Tk()
+    root.withdraw()
+    callback_errors = []
+    root.report_callback_exception = lambda *error: callback_errors.append(error)
+    settings = Settings(capture_width=960, capture_height=540, capture_fps=60, detection_fps=24)
+    app = DesktopApp(root, settings, Queue(), GestureEngine(settings), WindowsActions(dry_run=True), None,
+                     [RectMonitor("main", "Prueba", 0, 0, 1920, 1080, True)], smoke=True)
+    # Mirror only the synchronous reset part of restart; never start a worker.
+    app._restart_camera = Mock(side_effect=lambda restart: app._reset_gaze_session())
+    try:
+        yield app, root, tmp_path / "settings.json"
+        assert not callback_errors
+        assert app.actions._native is None and app._hook is None and app._tray is None
+        factory.assert_not_called()
+    finally:
+        app.smoke = True
+        app.request_close()
+        app.tick()
+        # This fixture's self-referencing mock is not a runtime callback.
+        # Do not leave the destroyed interpreter in a cyclic mock closure.
+        app._restart_camera.side_effect = None
+
+
+@pytest.mark.skipif(os.environ.get("BIOGESTURE_TEST_GUI") != "1", reason="Selector real optativo de Tk, sin dispositivos")
+@pytest.mark.parametrize("cursor_label,stored_cursor", [
+    ("Dedo índice", "index"),
+    ("Ojos (experimental)", "eyes"),
+])
+def test_control_dropdowns_save_and_reopen_without_replacing_full_quality(
+        real_control_settings_app, cursor_label, stored_cursor):
+    app, root, path = real_control_settings_app
+    quality = (app.settings.capture_width, app.settings.capture_height,
+               app.settings.capture_fps, app.settings.detection_fps)
+    app.open_settings()
+    root.update()
+    dialog = app._settings_dialog
+    tab = settings_tab(settings_notebook(dialog), "Control")
+    cursor = settings_control(tab, "Mover cursor con")
+    performance = settings_control(tab, "Rendimiento")
+    assert cursor.winfo_class() == "TCombobox"
+    assert tuple(cursor.cget("values")) == ("Dedo índice", "Ojos (experimental)")
+    assert str(cursor.cget("state")) == "readonly"
+    assert performance.cget("text") == "Óptimo (calidad máxima; fijo)"
+    cursor.set(cursor_label)
+    app.smoke = False
+    try:
+        settings_save(dialog).invoke()
+    finally:
+        app.smoke = True
+    assert app._settings_dialog is None
+    saved = Settings.load(path)
+    assert saved.cursor_mode == app.settings.cursor_mode == stored_cursor
+    assert saved.performance_mode == app.settings.performance_mode == "optimal"
+    assert (saved.capture_width, saved.capture_height, saved.capture_fps, saved.detection_fps) == quality
+    runtime = saved.runtime_settings()
+    assert (runtime.capture_width, runtime.capture_height, runtime.capture_fps, runtime.detection_fps) == quality
+    if stored_cursor != "index":
+        app._restart_camera.assert_called_once_with(True)
+    else:
+        app._restart_camera.assert_not_called()
+    assert app.engine.paused
+    app.open_settings()
+    root.update()
+    tab = settings_tab(settings_notebook(app._settings_dialog), "Control")
+    assert settings_control(tab, "Mover cursor con").get() == (
+        "Dedo índice" if stored_cursor == "index" else "Ojos (experimental)")
+    assert settings_control(tab, "Rendimiento").cget("text") == "Óptimo (calidad máxima; fijo)"
+    camera = settings_tab(settings_notebook(app._settings_dialog), "Cámara")
+    assert settings_control(camera, "Ancho solicitado").get() == "960"
+    assert settings_control(camera, "Alto solicitado").get() == "540"
+    assert settings_control(camera, "FPS de cámara").get() == "60"
+    assert settings_control(camera, "FPS de detección").get() == "24"
+
+
+@pytest.mark.skipif(os.environ.get("BIOGESTURE_TEST_GUI") != "1", reason="Texto real optativo de Tk, sin dispositivos")
+def test_distance_guidance_appears_only_in_control_settings_not_camera(real_control_settings_app):
+    from biogesture.desktop import EYE_DISTANCE_HINT
+
+    app, root, _ = real_control_settings_app
+    app.open_settings()
+    root.update()
+    notebook = settings_notebook(app._settings_dialog)
+    for name in ("Control", "Cámara", "Precisión", "Escritorio", "Diagnóstico"):
+        tab = settings_tab(notebook, name)
+        labels = " ".join(str(widget.cget("text")) for widget in tab.winfo_children()
+                          if widget.winfo_class() == "TLabel")
+        assert (EYE_DISTANCE_HINT in labels) is (name == "Control")
+    assert "50–70 cm" in EYE_DISTANCE_HINT
+    assert not app.canvas.find_all()
+    app._draw_empty_state()
+    assert not app.canvas.find_all()
+
+
+@pytest.mark.skipif(os.environ.get("BIOGESTURE_TEST_GUI") != "1", reason="Botón ocular real optativo de Tk, sin dispositivos")
+def test_eye_settings_calibrate_button_hands_off_validated_model_but_remains_paused(
+        real_control_settings_app, monkeypatch):
+    from tests.test_gaze import calibrated
+
+    app, root, path = real_control_settings_app
+    owner = SimpleNamespace(window=Mock())
+    wizard = Mock(return_value=owner)
+    monkeypatch.setattr("biogesture.gaze_ui.GazeCalibrationDialog", wizard)
+    app.open_settings()
+    root.update()
+    dialog = app._settings_dialog
+    tab = settings_tab(settings_notebook(dialog), "Control")
+    settings_control(tab, "Mover cursor con").set("Ojos (experimental)")
+    app.smoke = False
+    try:
+        settings_save(dialog).invoke()
+    finally:
+        app.smoke = True
+    assert Settings.load(path).cursor_mode == "eyes"
+    wizard.assert_not_called()
+    assert app.pipeline is None
+    app.open_settings()
+    root.update()
+    tab = settings_tab(settings_notebook(app._settings_dialog), "Control")
+    button = next(widget for widget in tab.winfo_children()
+                  if widget.winfo_class() == "TButton" and widget.cget("text") == "Calibrar mirada…")
+    button.invoke()
+    wizard.assert_called_once()
+    parent, monitor, latest, complete, close = wizard.call_args.args
+    assert parent is root
+    assert monitor == app.monitors[0]
+    assert latest() is None
+    assert app._calibration_dialog is owner.window
+    assert app.engine.paused
+    mapping = calibrated()
+    complete(mapping)
+    assert app._gaze_session.calibration is mapping
+    assert app._gaze_session.calibration.ready
+    assert app._gaze_state is None
+    assert app.engine.paused
+    assert app.actions._native is None
+    close()
+    assert app._calibration_dialog is None
+    assert app._gaze_dialog_owner is None
+    assert not app._gaze_prompt_pending
+    assert app.engine.paused
+
+
+@pytest.mark.skipif(os.environ.get("BIOGESTURE_TEST_GUI") != "1", reason="Persistencia ocular real optativa de Tk")
+@pytest.mark.parametrize("change_monitor", [False, True], ids=["landmarks-preserve", "monitor-invalidates"])
+def test_settings_preserve_eye_calibration_except_when_monitor_changes(real_control_settings_app, change_monitor):
+    from biogesture.gaze import GazeSession
+    from tests.test_gaze import calibrated
+
+    app, root, path = real_control_settings_app
+    app.settings.cursor_mode = "eyes"
+    app._reset_gaze_session()
+    mapping = calibrated()
+    session = GazeSession(mapping)
+    app._gaze_session = session
+    app._gaze_prompt_pending = False
+    app.monitors.append(RectMonitor("left", "Izquierda", -1920, 0, 1920, 1080))
+    app.open_settings()
+    root.update()
+    dialog = app._settings_dialog
+    tab = settings_tab(settings_notebook(dialog), "Escritorio")
+    if change_monitor:
+        settings_control(tab, "Monitor").set("left")
+    else:
+        settings_control(tab, "Dibujar puntos de mano").invoke()
+    app.smoke = False
+    try:
+        settings_save(dialog).invoke()
+    finally:
+        app.smoke = True
+    assert app._settings_dialog is None
+    app._restart_camera.assert_not_called()
+    assert app.engine.paused
+    if change_monitor:
+        assert app._gaze_session is not session
+        assert not app._gaze_session.calibration.ready
+        assert app._gaze_prompt_pending
+        assert app._gaze_mapper.monitor.id == "left"
+        assert Settings.load(path).monitor_id == "left"
+    else:
+        assert app._gaze_session is session
+        assert app._gaze_session.calibration is mapping
+        assert app._gaze_session.calibration.ready
+        assert not app._gaze_prompt_pending
+        assert Settings.load(path).show_landmarks

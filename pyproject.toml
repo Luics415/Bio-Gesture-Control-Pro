@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "bio-gesture-control-pro"
-version = "2.7.0"
-description = "Control del escritorio de Windows con una mano principal y una auxiliar"
+version = "3.0.0.dev4"
+description = "Control de Windows con manos y seguimiento ocular experimental calibrado"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = "MIT"

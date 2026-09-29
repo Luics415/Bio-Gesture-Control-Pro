@@ -23,7 +23,7 @@ def test_new_editing_shortcuts_work_independently_of_the_principal_profile(profi
     actions.set_profile(profile)
     expected = {"COPIAR": ("ctrl", "c"), "PEGAR": ("ctrl", "v"),
                 "DESHACER": ("ctrl", "z"), "REHACER": ("ctrl", "y")}
-    assert AUXILIARY_SHORTCUTS == expected
+    assert all(AUXILIARY_SHORTCUTS[name] == keys for name, keys in expected.items())
     for command, keys in expected.items():
         native.reset_mock()
         assert actions.handle(ActionEvent("auxiliary_command", command))
@@ -130,7 +130,8 @@ def test_selected_auxiliary_l_scrolls_while_only_principal_moves_cursor(label, f
     for index in range(1, fps * 2 + 1):
         now = 10 + index / fps
         main = hand("pointer", now, handedness=label, dx=-100 + index * .2)
-        secondary = l_hand(now, center_y=.2 if direction > 0 else .8, handedness=other)
+        secondary = l_hand(now, center_y=.5 if index <= fps * .6 else .2 if direction > 0 else .8,
+                           handedness=other)
         native.reset_mock()
         selected = frame(app, selector, [secondary, main] if index % 2 else [main, secondary], now)
         assert selected.sample is main and selected.auxiliary is secondary
@@ -142,25 +143,28 @@ def test_selected_auxiliary_l_scrolls_while_only_principal_moves_cursor(label, f
     assert not app.engine.paused
 
 
-def test_auxiliary_loss_reconfirms_at_the_same_fixed_image_position_without_interrupting_principal():
+def test_auxiliary_loss_reanchors_in_place_without_interrupting_principal():
     app, native = desktop(Settings(start_paused=False))
     selector = PrincipalHandSelector()
     frame(app, selector, [hand("pointer", 10, dx=-100)], 10)
     for index in range(1, 61):
         now = 10 + index / 30
-        frame(app, selector, [hand("pointer", now, dx=-100), l_hand(now, center_y=.1)], now)
+        frame(app, selector, [hand("pointer", now, dx=-100),
+                             l_hand(now, center_y=.5 if index <= 18 else .3)], now)
     assert native.scroll.call_count > 0
     wheel_before = native.scroll.call_count
     for index in range(1, 31):
         now = 12 + index / 30
         main = hand("pointer", now, dx=-100)
-        selected = frame(app, selector, [main] if index == 1 else [main, l_hand(now, center_y=.1)], now)
+        selected = frame(app, selector, [main] if index == 1 else [main, l_hand(now, center_y=.3)], now)
         assert selected.sample is main
         assert app.output.pointer is not None
-        if index <= 14:
-            assert native.scroll.call_count == wheel_before  # No inherited time or accumulated wheel fraction.
-    assert native.scroll.call_count > wheel_before  # Reconfirmed above center without moving to neutral.
+        assert native.scroll.call_count == wheel_before  # Reconfirmation establishes neutral at .3.
     assert native.move.call_count == 91
+    for index in range(1, 31):
+        now = 13 + index / 30
+        frame(app, selector, [hand("pointer", now, dx=-100), l_hand(now, center_y=.1)], now)
+    assert native.scroll.call_count > wheel_before
     native.button.assert_not_called()
 
 
@@ -172,7 +176,7 @@ def test_principal_drag_cancels_active_auxiliary_scroll_without_modifying_the_dr
         for app in (active, baseline):
             app.output = app.engine.update(hand("pointer", now), now)
             app._apply_output(app.output, now)
-        active._apply_auxiliary(l_hand(now, center_y=.1), now)
+        active._apply_auxiliary(l_hand(now, center_y=.5 if index <= 18 else .1), now)
     assert active_native.scroll.call_count > 0
     active_native.reset_mock()
     baseline_native.reset_mock()
@@ -185,3 +189,23 @@ def test_principal_drag_cancels_active_auxiliary_scroll_without_modifying_the_dr
         assert active.output == baseline.output
     assert active_native.mock_calls == baseline_native.mock_calls
     active_native.scroll.assert_not_called()
+
+
+@pytest.mark.parametrize("label", ["Left", "Right"])
+def test_selected_auxiliary_joined_fingers_open_task_view_once_without_changing_pointer(label):
+    app, native = desktop(Settings(start_paused=False))
+    selector = PrincipalHandSelector()
+    frame(app, selector, [hand("pointer", 10, handedness=label, dx=-100)], 10)
+    other = "Left" if label == "Right" else "Right"
+    for index in range(1, 91):
+        now = 10 + index / 30
+        main = hand("pointer", now, handedness=label, dx=-100 + index * .2)
+        secondary = hand("scroll_up", now, handedness=other, dx=140)
+        selected = frame(app, selector, [secondary, main], now)
+        assert selected.sample is main and selected.auxiliary is secondary
+        assert app.output.pointer == (main.landmarks[8].x, main.landmarks[8].y)
+    assert native.key.call_args_list == [call("win", True), call("tab", True),
+                                        call("tab", False), call("win", False)]
+    native.scroll.assert_not_called()
+    native.button.assert_not_called()
+    assert not app.engine.paused

@@ -66,7 +66,7 @@ class HandGeometry:
         """An extended hand may have curved fingers and an uncertain thumb.
 
         This cue belongs only to the temporal window gesture. The precise
-        finger features used for clicking, scrolling and pause are unchanged.
+        finger features used for clicking and pause are unchanged.
         """
         p = self.points
         relaxed = 0
@@ -213,8 +213,6 @@ class GestureEngine:
         self._menu_rearm_required = False
         self._pinch_since = None
         self._volume_y = None
-        self._scroll_time = None
-        self._scroll_carry = 0.0
         self._menu_open = False
         self._menu_origin = None
         self._menu_level = "PRINCIPAL"
@@ -362,7 +360,6 @@ class GestureEngine:
             self._candidate = ""
             self._close_menu()
             self._volume_y = None
-            self._scroll_time = None
             if wave.consumed:
                 return self._output(wave.state, events, progress=wave.progress)
             if self.paused:
@@ -376,7 +373,6 @@ class GestureEngine:
             events.extend(self._release())
             self._close_menu()
             self._volume_y = None
-            self._scroll_time = None
             progress = self._hold("PAUSA", now, s.pause_hold)
             if progress >= 1.0 and not self._pause_latched:
                 self.paused = not self.paused
@@ -392,7 +388,6 @@ class GestureEngine:
         if thumb_only:
             events.extend(self._release())
             self._volume_y = None
-            self._scroll_time = None
             if self._menu_rearm_required:
                 return self._output("SOLTAR GESTO", events)
             return self._menu(geometry, now, events)
@@ -416,8 +411,6 @@ class GestureEngine:
             self._volume_y = None
         if mode:
             self._candidate = ""
-            self._scroll_time = None
-            self._scroll_carry = 0.0
             if mode == "PINZA":
                 if self._left_rearm_required:
                     return self._output("SOLTAR GESTO", events)
@@ -447,28 +440,9 @@ class GestureEngine:
             pointer = (sample.landmarks[8].x, sample.landmarks[8].y) if mode == "CLIC DERECHO" else None
             return self._output(mode, events, pointer)
 
-        together = geometry.distance(8, 12) < 0.28
-        scroll_up = together and index and middle and not ring and not little
-        # Preserve the legacy bent pair for down, excluding an ordinary closed fist.
-        scroll_down = together and not index and not middle and not ring and not little and geometry.distance(8, 16) > 0.38
-        if (scroll_up or scroll_down) and not geometry.thumb_extended:
-            events.extend(self._release())
-            direction = 1 if scroll_up else -1
-            progress = self._hold("SCROLL " + str(direction), now, s.scroll_hold)
-            if progress >= 1.0:
-                if self._scroll_time is not None:
-                    self._scroll_carry += direction * s.scroll_rate * (now - self._scroll_time)
-                    steps = math.trunc(self._scroll_carry)
-                    if steps:
-                        self._scroll_carry -= steps
-                        events.append(ActionEvent("scroll", steps))
-                self._scroll_time = now
-            else:
-                self._scroll_time = None
-                self._scroll_carry = 0.0
-            return self._output("SCROLL" if progress >= 1.0 else "PREPARANDO SCROLL", events, progress=progress)
-        self._scroll_time = None
-        self._scroll_carry = 0.0
+        # Scrolling belongs exclusively to the auxiliary hand's L gesture in
+        # 3.0. Former straight/bent two-finger scroll poses are ordinary pointer
+        # poses here, so they cannot scroll accidentally or suspend navigation.
         self._candidate = ""
         # The legacy cursor always used landmark 8. Other fingers need not form
         # an index-only pose; only the exclusive modes above suspend navigation.

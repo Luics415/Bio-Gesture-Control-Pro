@@ -47,12 +47,10 @@ def wheel(events):
     return sum(event.value for event in events)
 
 
-@pytest.mark.parametrize(("center_y", "direction"), [(.2, 1), (.8, -1)])
-def test_l_held_above_or_below_center_scrolls_without_first_visiting_center(center_y, direction):
+@pytest.mark.parametrize("center_y", [.15, .35, .5, .7, .85])
+def test_stationary_l_at_any_activation_height_is_neutral(center_y):
     engine = AuxiliaryGestureEngine(Settings())
-    assert not l_frames(engine, duration=.4, center_y=center_y)
-    events = l_frames(engine, start=10.4, duration=1.6, center_y=center_y)
-    assert events and all(event.value * direction > 0 for event in events)
+    assert not l_frames(engine, duration=3, center_y=center_y)
 
 
 @pytest.mark.parametrize(("center_y", "direction"), [(0.0, 1), (1.0, -1)])
@@ -61,13 +59,17 @@ def test_confirmation_does_not_count_the_preceding_hold_as_scroll_time(center_y,
     for frame in range(10):
         now = 10 + frame * .05
         assert not engine.update(l_hand(now, center_y=center_y), now)
-    assert engine.update(l_hand(10.5, center_y=center_y), 10.5) == (ActionEvent("scroll", direction),)
+    assert not engine.update(l_hand(10.5, center_y=center_y), 10.5)
+    assert engine.update(l_hand(10.55, center_y=center_y, dy=-direction * 150), 10.55) == (
+        ActionEvent("scroll", direction),)
 
 
-@pytest.mark.parametrize("center_y", [.45, .475, .5, .525, .55])
-def test_stationary_l_in_fixed_neutral_band_never_scrolls(center_y):
+@pytest.mark.parametrize("offset", [-.12, -.06, 0, .06, .12])
+def test_stationary_l_in_anchor_neutral_band_never_scrolls(offset):
     engine = AuxiliaryGestureEngine(Settings())
-    assert not l_frames(engine, duration=10, center_y=center_y)
+    assert not l_frames(engine, center_y=.25)
+    scale = HandGeometry(l_hand()).scale
+    assert not l_frames(engine, start=10.65, duration=10, center_y=.25, dy=offset * scale)
 
 
 @pytest.mark.parametrize("fps", [5, 10, 15, 30, 60])
@@ -86,17 +88,19 @@ def test_scroll_amount_is_time_based_at_all_supported_test_rates():
     for fps in (5, 10, 15, 30):
         engine = AuxiliaryGestureEngine(Settings(scroll_rate=9.0, detection_fps=fps))
         l_frames(engine, fps=fps)
-        totals.append(wheel(l_frames(engine, start=10.6, duration=3, fps=fps, center_y=.3)))
+        scale = HandGeometry(l_hand()).scale
+        totals.append(wheel(l_frames(engine, start=10.6, duration=3, fps=fps, dy=-.48 * scale)))
     assert max(totals) - min(totals) <= 1
     assert all(abs(total - 13.5) <= 1 for total in totals)
 
 
 def test_speed_is_proportional_and_bounded_by_settings():
     totals = []
-    for center_y in (.45, .3, 0, -.5):
+    for offset in (.12, .48, 1.2, 2.4):
         engine = AuxiliaryGestureEngine(Settings(scroll_rate=6.0))
         l_frames(engine)
-        totals.append(wheel(l_frames(engine, start=10.6, duration=2, center_y=center_y)))
+        scale = HandGeometry(l_hand()).scale
+        totals.append(wheel(l_frames(engine, start=10.6, duration=2, dy=-offset * scale)))
     assert totals[0] == 0
     assert abs(totals[1] - 6) <= 1
     assert abs(totals[2] - 12) <= 1
@@ -108,7 +112,8 @@ def test_dead_zone_noise_and_horizontal_motion_do_not_accumulate_scroll():
     l_frames(engine)
     for frame in range(1, 151):
         now = 10.6 + frame / 30
-        sample = l_hand(now, dx=140 + 70 * math.sin(frame), center_y=.5 + .049 * math.sin(frame * 1.1))
+        scale = HandGeometry(l_hand()).scale
+        sample = l_hand(now, dx=140 + 70 * math.sin(frame), dy=.119 * scale * math.sin(frame * 1.1))
         assert not engine.update(sample, now)
 
 
@@ -146,8 +151,10 @@ def test_interruptions_drop_fraction_and_reconfirm_in_place_without_catchup(inte
     elif interruption == "release":
         assert not engine.update(hand("pointer", 10.75), 10.75)
     # The gap case leaves a 0.2 s interval without an explicit missing sample.
-    assert not l_frames(engine, start=10.9, duration=.4, center_y=0)
-    assert wheel(l_frames(engine, start=11.3, duration=1, center_y=0)) > 0
+    assert not l_frames(engine, start=10.9, duration=.6, center_y=.2)
+    # Reconfirmed in place: the old displacement is no longer active.
+    assert not l_frames(engine, start=11.55, duration=.5, center_y=.2)
+    assert wheel(l_frames(engine, start=12.1, duration=1, center_y=.2, dy=-150)) > 0
 
 
 def test_repeated_and_stale_frames_never_repeat_wheel_events():
@@ -157,8 +164,8 @@ def test_repeated_and_stale_frames_never_repeat_wheel_events():
     assert not engine.update(sample, 10.7)
     for now in (10.75, 10.8, 10.9, 11.0, 11.1):
         assert not engine.update(sample, now)
-    assert not l_frames(engine, start=11.15, duration=.4, center_y=.2)
-    assert wheel(l_frames(engine, start=11.55, duration=1, center_y=.2)) > 0
+    assert not l_frames(engine, start=11.15, duration=.6, center_y=.2)
+    assert wheel(l_frames(engine, start=11.8, duration=1, center_y=.2, dy=-150)) > 0
 
 
 @pytest.mark.parametrize("fps", [5, 10, 15, 30])
@@ -169,8 +176,8 @@ def test_adaptive_gap_reset_prevents_catchup_at_low_and_high_detection_rates(fps
     assert events and max(abs(event.value) for event in events) <= math.ceil(20 / fps)
     limit = min(.35, max(.15, 1.5 / fps))
     restart = 11.6 + limit + .01
-    assert not l_frames(engine, start=restart, duration=.4, fps=fps, center_y=.1)
-    recovered = l_frames(engine, start=restart + .4, duration=1, fps=fps, center_y=.1)
+    assert not l_frames(engine, start=restart, duration=.6, fps=fps, center_y=.3)
+    recovered = l_frames(engine, start=restart + .6, duration=1, fps=fps, center_y=.3, dy=-150)
     assert recovered and max(abs(event.value) for event in recovered) <= math.ceil(20 / fps)
 
 
@@ -179,8 +186,8 @@ def test_explicit_missing_frame_always_cancels_even_within_adaptive_gap(fps):
     engine = AuxiliaryGestureEngine(Settings(detection_fps=fps))
     l_frames(engine, fps=fps)
     assert not engine.update(None, 10.61)
-    assert not l_frames(engine, start=10.65, duration=.4, fps=fps, center_y=.1)
-    assert wheel(l_frames(engine, start=11.05, duration=1, fps=fps, center_y=.1)) > 0
+    assert not l_frames(engine, start=10.65, duration=.6, fps=fps, center_y=.3)
+    assert wheel(l_frames(engine, start=11.25, duration=1, fps=fps, center_y=.3, dy=-150)) > 0
 
 
 @pytest.mark.parametrize("tip", [8, 12, 16, 20])
@@ -190,8 +197,8 @@ def test_pinches_immediately_cancel_scroll_then_issue_only_one_command(tip):
     assert not engine.update(l_hand(10.7, center_y=0), 10.7)
     events = pinch_frames(engine, tip, start=10.75, duration=1)
     assert len(events) == 1 and events[0].kind == "command"
-    assert not l_frames(engine, start=11.8, duration=.4, center_y=0)
-    assert wheel(l_frames(engine, start=12.2, duration=1, center_y=0)) > 0
+    assert not l_frames(engine, start=11.8, duration=.6, center_y=.2)
+    assert wheel(l_frames(engine, start=12.45, duration=1, center_y=.2, dy=-150)) > 0
 
 
 @pytest.mark.parametrize("pose", ["pointer", "thumb", "palm", "fist", "victory", "scroll_up", "scroll_down"])
@@ -229,41 +236,93 @@ def test_l_scroll_is_scale_aspect_orientation_and_label_independent(handedness, 
 @pytest.mark.parametrize("handedness", ["Left", "Right"])
 @pytest.mark.parametrize(("width", "height"), [(640, 480), (1280, 720), (480, 640), (1920, 1080)])
 @pytest.mark.parametrize(("center_y", "direction"), [(.2, 1), (.8, -1)])
-def test_same_normalized_image_position_has_same_rate_without_initial_anchor(
+def test_same_palm_relative_deflection_has_same_rate_across_camera_dimensions(
         fps, mirror, handedness, width, height, center_y, direction):
     engine = AuxiliaryGestureEngine(Settings(scroll_rate=6.0, detection_fps=fps, mirror=mirror))
-    events = l_frames(engine, duration=2, fps=fps, center_y=center_y, mirror=mirror,
-                      handedness=handedness, width=width, height=height)
-    # |0.5-y|=.30: speed=6*(.25+.75*(.30-.05)/(.50-.05))=4, active for 1.55 s.
+    kwargs = dict(fps=fps, center_y=center_y, mirror=mirror,
+                  handedness=handedness, width=width, height=height)
+    assert not l_frames(engine, **kwargs)
+    scale = HandGeometry(l_hand(width=width, height=height)).scale
+    events = l_frames(engine, start=10.6, duration=2, dy=-direction * .48 * scale, **kwargs)
+    # Deflection .48 palm: rate=6*(.25+.75*(.48-.12)/(1.2-.12))=3/s.
     assert wheel(events) == direction * 6
 
 
-def test_speed_depends_on_image_position_not_palm_size_or_activation_height():
+def test_speed_depends_on_palm_relative_deflection_not_size_or_activation_height():
     totals = []
     for size in (.6, 1, 1.8):
         for initial_y in (.2, .5, .8):
             engine = AuxiliaryGestureEngine(Settings(scroll_rate=6.0))
             l_frames(engine, center_y=initial_y, size=size)
-            # Clear any fraction without losing the confirmed L.
-            assert not engine.update(l_hand(10.65, size=size, center_y=.5), 10.65)
-            totals.append(wheel(l_frames(engine, start=10.7, duration=2, size=size, center_y=.2)))
+            scale = HandGeometry(l_hand(size=size)).scale
+            totals.append(wheel(l_frames(engine, start=10.6, duration=2, size=size,
+                                         center_y=initial_y, dy=-.48 * scale)))
     assert len(set(totals)) == 1
 
 
-def test_fixed_neutral_band_stops_even_when_l_was_activated_elsewhere():
+def test_returning_to_activation_height_stops_even_outside_old_image_neutral():
     engine = AuxiliaryGestureEngine(Settings())
-    assert wheel(l_frames(engine, duration=2, center_y=.2)) > 0
-    for index, center_y in enumerate((.45, .5, .55)):
-        assert not l_frames(engine, start=12.05 + index * .05, duration=0, center_y=center_y)
-    assert not l_frames(engine, start=12.2, duration=2, center_y=.5)
+    assert not l_frames(engine, center_y=.2)
+    assert wheel(l_frames(engine, start=10.65, duration=2, center_y=.5)) < 0
+    assert not l_frames(engine, start=12.7, duration=2, center_y=.2)
 
 
 def test_unreliable_scale_jump_requires_reconfirmation_without_a_scroll_burst():
     engine = AuxiliaryGestureEngine(Settings())
     l_frames(engine)
     assert not engine.update(l_hand(10.65, size=2.0, center_y=.1), 10.65)
-    assert not l_frames(engine, start=10.7, duration=.4, size=2.0, center_y=.1)
-    assert wheel(l_frames(engine, start=11.1, duration=1, size=2.0, center_y=.1)) > 0
+    assert not l_frames(engine, start=10.7, duration=.6, size=2.0, center_y=.3)
+    assert wheel(l_frames(engine, start=11.35, duration=1, size=2.0, center_y=.3, dy=-150)) > 0
+
+
+def test_anchor_is_taken_at_confirmation_not_at_first_unconfirmed_frame():
+    engine = AuxiliaryGestureEngine(Settings())
+    for frame in range(10):
+        now = 10 + frame * .05
+        assert not engine.update(l_hand(now, center_y=.7 - frame * .04), now)
+    assert not l_frames(engine, start=10.5, duration=2, center_y=.34)
+    assert wheel(l_frames(engine, start=12.55, duration=1, center_y=.34, dy=-100)) > 0
+
+
+def test_opening_the_hand_stops_an_active_scroll_and_new_l_reanchors():
+    engine = AuxiliaryGestureEngine(Settings())
+    assert not l_frames(engine, center_y=.7)
+    assert wheel(l_frames(engine, start=10.65, duration=1, center_y=.3)) > 0
+    assert not engine.update(hand("palm", 11.7), 11.7)
+    assert not l_frames(engine, start=11.75, duration=2, center_y=.3)
+    assert wheel(l_frames(engine, start=13.8, duration=1, center_y=.6)) < 0
+
+
+@pytest.mark.parametrize("sensitivity", [.2, .5, 1, 2, 3])
+def test_sensitivity_changes_rate_without_shifting_the_neutral_anchor(sensitivity):
+    engine = AuxiliaryGestureEngine(Settings(scroll_rate=6, auxiliary_scroll_sensitivity=sensitivity))
+    assert not l_frames(engine, center_y=.7)
+    scale = HandGeometry(l_hand()).scale
+    assert not l_frames(engine, start=10.65, duration=1, center_y=.7, dy=.12 * scale)
+    total = wheel(l_frames(engine, start=11.7, duration=2, center_y=.7, dy=-.48 * scale))
+    expected = 2 * 6 * (.25 + .75 * min(1, .36 * sensitivity / 1.08))
+    assert abs(total - expected) <= 1
+
+
+@pytest.mark.parametrize("dead_zone", [.03, .12, .4, .6])
+def test_configurable_palm_relative_dead_zone_is_respected(dead_zone):
+    engine = AuxiliaryGestureEngine(Settings(auxiliary_scroll_dead_zone=dead_zone))
+    scale = HandGeometry(l_hand()).scale
+    assert not l_frames(engine)
+    assert not l_frames(engine, start=10.65, duration=1, dy=-dead_zone * scale)
+    assert wheel(l_frames(engine, start=11.7, duration=1, dy=-(dead_zone + .03) * scale)) > 0
+
+
+@pytest.mark.parametrize(("setting", "value"), [
+    ("auxiliary_scroll_dead_zone", math.nan), ("auxiliary_scroll_dead_zone", .61),
+    ("auxiliary_scroll_dead_zone", -.1), ("auxiliary_scroll_dead_zone", True),
+    ("auxiliary_scroll_sensitivity", math.inf), ("auxiliary_scroll_sensitivity", "bad"),
+    ("auxiliary_scroll_sensitivity", 0), ("auxiliary_scroll_sensitivity", 4),
+])
+def test_invalid_scroll_configuration_fails_closed(setting, value):
+    engine = AuxiliaryGestureEngine(replace(Settings(), **{setting: value}))
+    assert not l_frames(engine)
+    assert not l_frames(engine, start=10.65, duration=1, dy=-150)
 
 
 def test_auxiliary_l_and_pinch_do_not_change_primary_engine_behavior_or_settings():

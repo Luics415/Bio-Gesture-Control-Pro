@@ -43,6 +43,8 @@ def fake_bundle(tmp_path):
         put(bundle / destination, pdf)
     for relative in ("python312.dll", "_tcl_data/init.tcl", "_tk_data/tk.tcl", "licenses/PYTHON-LICENSE.txt"):
         put(bundle / "_internal" / relative)
+    for name in portable.OPENVINO_DLLS:
+        put(bundle / "_internal/openvino/libs" / name)
     manifest = {"files": {path.relative_to(bundle).as_posix(): portable.sha256(path)
                           for path in portable.portable_members(bundle)}}
     put(bundle / "BUILD-MANIFEST.json", json.dumps(manifest).encode())
@@ -208,6 +210,17 @@ def detector_report():
             "python": "3.12.10"}
 
 
+def gaze_report():
+    from biogesture.face_tracking import FACE_MODEL_SHA256
+    from biogesture.gaze_neural import MODEL_ASSETS
+    return {"ok": True, "version": portable.application_version(), "frozen": True, "frames": 3, "features": 6,
+            "error": None, "platform": "Windows", "architecture": "AMD64", "python": "3.12.10",
+            "runtime": "2024.6.0-native-build", "converter_loaded": False, "telemetry_loaded": False,
+            "network_attempts": 0, "camera_opened": False, "system_input": False,
+            "accuracy_validation": "not_measured", "models_sha384": {a.filename: a.sha384 for a in MODEL_ASSETS},
+            "face_detector": {"frames": 1, "detected_faces": 0, "model_sha256": FACE_MODEL_SHA256}}
+
+
 def test_synthetic_verification_uses_only_smoke_flags_and_isolated_paths(tmp_path, monkeypatch):
     stage = tmp_path / "stage"
     executable = tmp_path / portable.APP_NAME / (portable.APP_NAME + ".exe")
@@ -215,16 +228,19 @@ def test_synthetic_verification_uses_only_smoke_flags_and_isolated_paths(tmp_pat
     def probe(command, **kwargs):
         if "--detector-smoke" in command:
             put(stage / "smoke-data/detector-smoke.json", json.dumps(detector_report()).encode())
+        if "--gaze-smoke" in command:
+            put(stage / "smoke-data/gaze-smoke.json", json.dumps(gaze_report()).encode())
         return 0
 
     calls = Mock(side_effect=probe)
     monkeypatch.setattr(portable, "run_probe", calls)
     monkeypatch.setenv("BIOGESTURE_FROZEN_STDIO_READY", "must-be-cleared")
     result = portable.run_smoke(executable, stage)
-    assert set(result) == {"detector", "desktop"}
-    assert calls.call_count == 2
+    assert set(result) == {"detector", "gaze", "desktop"}
+    assert calls.call_count == 3
     assert calls.call_args_list[0].args[0] == [str(executable), "--detector-smoke"]
-    assert calls.call_args_list[1].args[0] == [str(executable), "--smoke", "--smoke-seconds", ".3"]
+    assert calls.call_args_list[1].args[0] == [str(executable), "--gaze-smoke"]
+    assert calls.call_args_list[2].args[0] == [str(executable), "--smoke", "--smoke-seconds", ".3"]
     for call in calls.call_args_list:
         assert call.kwargs["cwd"] == stage
         environment = call.kwargs["environment"]
@@ -299,13 +315,16 @@ def test_unicode_portability_runs_relocated_exe_and_isolates_all_probe_data(tmp_
         assert environment["BIOGESTURE_DATA_DIR"] == str(cwd / "smoke-data")
         if "--detector-smoke" in command:
             put(cwd / "smoke-data/detector-smoke.json", json.dumps(detector_report()).encode())
+        if "--gaze-smoke" in command:
+            put(cwd / "smoke-data/gaze-smoke.json", json.dumps(gaze_report()).encode())
         return 0
 
     monkeypatch.setattr(portable, "run_probe", probe)
     result = portable.verify_unicode_portability(bundle, stage, root)
-    assert set(result) == {"detector", "desktop"}
+    assert set(result) == {"detector", "gaze", "desktop"}
     assert calls[0][1:] == ["--detector-smoke"]
-    assert calls[1][1:] == ["--smoke", "--smoke-seconds", ".3"]
+    assert calls[1][1:] == ["--gaze-smoke"]
+    assert calls[2][1:] == ["--smoke", "--smoke-seconds", ".3"]
     after = {p.relative_to(bundle).as_posix(): portable.sha256(p) for p in portable.portable_members(bundle)}
     assert before == after
     assert not (bundle / "smoke-data").exists()
@@ -376,8 +395,9 @@ def test_missing_manual_requires_prior_generation_and_does_not_copy_partial_docs
 def test_environment_check_requires_generated_pdf_without_using_local_output(tmp_path, monkeypatch):
     root, _ = fake_bundle(tmp_path)
     (root / next(iter(portable.PUBLIC_ASSET_MAP))).unlink()
-    monkeypatch.setattr(portable, "pinned_packages", lambda path: dict(portable.BUILD_TOOLS))
-    monkeypatch.setattr(portable.metadata, "version", lambda name: portable.BUILD_TOOLS[name])
+    monkeypatch.setattr(portable, "pinned_packages", lambda path: dict(portable.GAZE_RUNTIME)
+                        if Path(path).name == "requirements-gaze.lock.txt" else dict(portable.BUILD_TOOLS))
+    monkeypatch.setattr(portable.metadata, "version", lambda name: {**portable.BUILD_TOOLS, **portable.GAZE_RUNTIME}[name])
     original_sha256 = portable.sha256
     model = root / "assets/models/hand_landmarker.task"
     monkeypatch.setattr(portable, "sha256", lambda path: portable.MODEL_SHA256 if Path(path) == model
@@ -438,7 +458,7 @@ def test_source_snapshot_tracks_manual_and_builder_but_no_private_files(tmp_path
     root, _ = fake_bundle(tmp_path)
     for relative in ("control.py", "pyproject.toml", "packaging/BioGestureControlPro.spec",
                      "scripts/build_portable.py", "scripts/build-portable.ps1", portable.MANUAL_BUILDER,
-                     *portable.MANUAL_DEPENDENCIES, "requirements.lock.txt", "requirements-build.lock.txt",
+                     *portable.MANUAL_DEPENDENCIES, portable.BUILD_SUPPORT, "requirements.lock.txt", "requirements-build.lock.txt", "requirements-gaze.lock.txt",
                      "biogesture/__init__.py"):
         put(root / relative)
     put(root / "docs/captures/private/camera.png", b"private")
@@ -446,6 +466,7 @@ def test_source_snapshot_tracks_manual_and_builder_but_no_private_files(tmp_path
     source = next(iter(portable.PUBLIC_ASSET_MAP))
     before = portable.source_snapshot(root)
     assert source in before and portable.MANUAL_BUILDER in before
+    assert portable.BUILD_SUPPORT in before
     assert portable.MANUAL_DEPENDENCIES == ("scripts/manual_hands.py",)
     assert all(name in before for name in portable.MANUAL_DEPENDENCIES)
     assert before[source] == portable.sha256(root / source)

@@ -1,0 +1,7 @@
+# Complemento al requirements.lock.txt base (instalar éste primero).
+# Solo CPython 3.12 Windows x64. Huellas oficiales PyPI, 2026-09-08.
+# No resolver/actualizar dependencias base: pip install --no-deps --require-hashes -r requirements-gaze.lock.txt
+openvino==2024.6.0 \
+    --hash=sha256:f7177d9a734a61a0708bcd706592f59fc2377d8efbb0bf9f8a33edfd2998a45d
+openvino-telemetry==2025.2.0 \
+    --hash=sha256:bcb667e83a44f202ecf4cfa49281715c6d7e21499daec04ff853b7f964833599

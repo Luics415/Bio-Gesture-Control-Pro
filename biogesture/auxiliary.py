@@ -1,4 +1,4 @@
-"""Auxiliary pinches and L-pose scrolling; descriptive events, no desktop input."""
+"""Auxiliary pinches, anchored L-scroll and task view; no desktop input."""
 
 import math
 
@@ -12,7 +12,7 @@ FINGER_TIPS = (8, 12, 16, 20)
 
 
 class AuxiliaryGestureEngine:
-    """Hold a pinch for one command or an L for image-centered scrolling.
+    """Hold a pinch for one command or an L for activation-anchored scrolling.
 
     The caller owns role assignment and must disable this engine whenever the
     auxiliary is not authorized. A sample's handedness is not an authorization.
@@ -20,13 +20,13 @@ class AuxiliaryGestureEngine:
     """
 
     HOLD_SECONDS = 0.45
+    TASK_VIEW_HOLD_SECONDS = 0.65
     MAX_SAMPLE_AGE = 0.35
     MIN_SCROLL_GAP = 0.15
     MAX_SCROLL_GAP = 0.35
-    # Normalized camera-image Y: stop within 0.45..0.55, full speed at 0 or 1.
-    SCROLL_CENTER_Y = 0.5
-    SCROLL_DEAD_ZONE = 0.05
-    SCROLL_FULL_SPEED = 0.5
+    # Displacement is measured in palm scales from the confirmed L, not from
+    # the image center. The same physical gesture works at any activation Y.
+    SCROLL_FULL_SPEED = 1.2
     SCROLL_MIN_SPEED_FRACTION = 0.25
     L_MIN_ANGLE = 55.0
     L_MAX_ANGLE = 125.0
@@ -40,9 +40,15 @@ class AuxiliaryGestureEngine:
         self._candidate = None
         self._candidate_since = None
         self._clear_scroll()
+        self._clear_task_hold()
+
+    def _clear_task_hold(self) -> None:
+        self._task_since = None
+        self._task_timestamp = None
 
     def _clear_scroll(self) -> None:
         self._l_since = None
+        self._scroll_anchor_y = None
         self._scroll_scale = None
         self._scroll_timestamp = None
         self._scroll_carry = 0.0
@@ -52,6 +58,7 @@ class AuxiliaryGestureEngine:
         """Hard reset for an explicitly new role/session, not tracking loss."""
         self.reset()
         self._latched_tip = None
+        self._task_latched = False
         self._last_timestamp = None
         self._last_now = None
         self._commands = None
@@ -124,7 +131,36 @@ class AuxiliaryGestureEngine:
         cosine = sum(x * y for x, y in zip(u, v)) / denominator
         return math.degrees(math.acos(max(-1.0, min(1.0, cosine))))
 
-    def _scroll(self, geometry: HandGeometry, timestamp: float, image_height: float) -> tuple[ActionEvent, ...]:
+    def _is_task_pose(self, geometry: HandGeometry, *, releasing: bool = False) -> bool:
+        """Two extended joined fingers, folded ring/little/thumb; not victory.
+
+        A wider exit threshold avoids rearming on tiny finger separation noise.
+        Pinches always own their existing activation/release thresholds.
+        """
+        separation = 0.45 if releasing else 0.30
+        return (geometry.extended == (True, True, False, False)
+                and not geometry.thumb_extended
+                and geometry.distance(8, 12) <= separation
+                and all(geometry.distance(4, tip) >= self.settings.pinch_open for tip in FINGER_TIPS))
+
+    def _task_view(self, timestamp: float) -> tuple[ActionEvent, ...]:
+        frequency = self.settings.detection_fps
+        if not self._finite(frequency) or frequency <= 0:
+            self._clear_task_hold()
+            return ()
+        gap_limit = min(self.MAX_SCROLL_GAP, max(self.MIN_SCROLL_GAP, 1.5 / frequency))
+        if self._task_timestamp is not None and timestamp - self._task_timestamp > gap_limit + 1e-9:
+            self._clear_task_hold()
+        self._task_timestamp = timestamp
+        if self._task_since is None:
+            self._task_since = timestamp
+        if timestamp - self._task_since + 1e-9 < self.TASK_VIEW_HOLD_SECONDS:
+            return ()
+        self._task_latched = True
+        self.reset()
+        return (ActionEvent("command", "VISTA_TAREAS"),)
+
+    def _scroll(self, geometry: HandGeometry, timestamp: float) -> tuple[ActionEvent, ...]:
         if not self._is_l_pose(geometry):
             self._clear_scroll()
             return ()
@@ -143,16 +179,24 @@ class AuxiliaryGestureEngine:
             self._l_since = timestamp
         if timestamp - self._l_since + 1e-9 < self.HOLD_SECONDS:
             return ()
-        if self._scroll_scale is None:
+        center_y = sum(geometry.points[i][1] for i in (0, 5, 9, 13, 17)) / 5
+        if self._scroll_anchor_y is None:
+            # Confirm at the current position. Motion during preparation must
+            # neither start scrolling nor be inherited as active wheel time.
+            self._scroll_anchor_y = center_y
             self._scroll_scale = geometry.scale
+            return ()
         if not 0.55 <= geometry.scale / self._scroll_scale <= 1.8:
             self._clear_scroll()
             return ()
-        # The palm's vertical position is measured against the fixed image
-        # center, never against where the hand happened to confirm the L.
-        center_y = sum(geometry.points[i][1] for i in (0, 5, 9, 13, 17)) / (5 * image_height)
-        displacement = self.SCROLL_CENTER_Y - center_y
-        magnitude = abs(displacement) - self.SCROLL_DEAD_ZONE
+        dead_zone = self.settings.auxiliary_scroll_dead_zone
+        sensitivity = self.settings.auxiliary_scroll_sensitivity
+        if (not self._finite(dead_zone) or not 0.03 <= dead_zone <= 0.6
+                or not self._finite(sensitivity) or not 0.2 <= sensitivity <= 3.0):
+            self._clear_scroll()
+            return ()
+        displacement = (self._scroll_anchor_y - center_y) / self._scroll_scale
+        magnitude = abs(displacement) - dead_zone
         if magnitude <= 1e-9:
             self._scroll_carry = 0.0
             self._scroll_direction = 0
@@ -165,15 +209,14 @@ class AuxiliaryGestureEngine:
         if not self._finite(maximum_rate) or maximum_rate <= 0:
             self._clear_scroll()
             return ()
-        deflection = min(1.0, magnitude / (self.SCROLL_FULL_SPEED - self.SCROLL_DEAD_ZONE))
+        deflection = min(1.0, magnitude * sensitivity / (self.SCROLL_FULL_SPEED - dead_zone))
         # A confirmed L just outside neutral must not take minutes to produce a
         # wheel step. Neutral still stops immediately and clears the fraction.
         speed = maximum_rate * (self.SCROLL_MIN_SPEED_FRACTION
                                 + (1 - self.SCROLL_MIN_SPEED_FRACTION) * deflection)
-        # A low-FPS confirmation may arrive after the hold deadline. Integrate
-        # only its active part, not the preceding 0.45 seconds of preparation.
-        active_since = self._l_since + self.HOLD_SECONDS
-        elapsed = timestamp - max(previous if previous is not None else timestamp, active_since)
+        # The anchor is fixed for the entire hold. Holding a deflection keeps
+        # scrolling; only a fresh observation contributes bounded elapsed time.
+        elapsed = timestamp - (previous if previous is not None else timestamp)
         self._scroll_carry += direction * speed * elapsed
         # Monotonic decimal timestamps may represent an exact whole step as
         # 3.99999999999998; do not defer that step and bunch it into the next frame.
@@ -234,12 +277,22 @@ class AuxiliaryGestureEngine:
                 self._clear_scroll()
                 return ()
             self._latched_tip = None
+        if self._task_latched:
+            if self._is_task_pose(geometry, releasing=True):
+                self._clear_scroll()
+                return ()
+            self._task_latched = False
         if self._candidate is not None and distances[self._candidate] >= self.settings.pinch_open:
             self.reset()
         if self._candidate is None:
             tip = min(FINGER_TIPS, key=distances.__getitem__)
             if distances[tip] >= self.settings.pinch_close:
-                return self._scroll(geometry, timestamp, sample.height)
+                if self._is_task_pose(geometry):
+                    self._clear_scroll()
+                    return self._task_view(timestamp)
+                self._clear_task_hold()
+                return self._scroll(geometry, timestamp)
+            self._clear_task_hold()
             self._clear_scroll()
             self._candidate, self._candidate_since = tip, timestamp
             return ()

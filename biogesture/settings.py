@@ -4,7 +4,7 @@ import json
 import logging
 import math
 import os
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, fields, replace
 from pathlib import Path
 
 
@@ -50,6 +50,20 @@ class Settings:
     show_landmarks: bool = False
     profile: str = "Global"
     auxiliary_enabled: bool = True
+    cursor_mode: str = "index"
+    gaze_engine: str = "precision-openvino-v2"
+    performance_mode: str = "optimal"
+    auxiliary_scroll_dead_zone: float = 0.12
+    auxiliary_scroll_sensitivity: float = 1.0
+
+    def runtime_settings(self) -> "Settings":
+        """Return the always-full-quality runtime profile.
+
+        ``saving`` remains readable for compatibility with old settings files,
+        but is no longer a selectable or effective runtime mode.
+        """
+        self.validate()
+        return replace(self, performance_mode="optimal")
 
     def validate(self) -> "Settings":
         for f in fields(self):
@@ -72,6 +86,7 @@ class Settings:
             "min_cutoff": (0.5, 8.0), "filter_beta": (0.0, 0.2), "opacity": (0.4, 1.0),
             "active_left": (0.0, 0.8), "active_top": (0.0, 0.8),
             "active_right": (0.2, 1.0), "active_bottom": (0.2, 1.0),
+            "auxiliary_scroll_dead_zone": (0.03, 0.6), "auxiliary_scroll_sensitivity": (0.2, 3.0),
         }
         for key, (low, high) in bounds.items():
             if not low <= getattr(self, key) <= high:
@@ -82,6 +97,12 @@ class Settings:
             raise ValueError("El área de control debe medir al menos 20% por eje")
         if self.profile not in ("Global", "VS Code", "Navegador", "Multimedia"):
             raise ValueError("Perfil inválido")
+        if self.cursor_mode not in ("index", "eyes"):
+            raise ValueError("Control de cursor inválido")
+        if self.gaze_engine not in ("precision-openvino-v2", "precision-openvino-v1", "legacy-ridge-v1"):
+            raise ValueError("Motor ocular inválido")
+        if self.performance_mode not in ("optimal", "saving"):
+            raise ValueError("Modo de rendimiento inválido")
         if self.schema_version != 3:
             raise ValueError("Formato de configuración no compatible")
         return self
@@ -108,6 +129,10 @@ class Settings:
                 if raw.get("wave_amplitude", 0.65) == 0.65 and raw.get("wave_window", 1.6) == 1.6:
                     raw["wave_amplitude"], raw["wave_window"] = 0.50, 2.2
                 raw["schema_version"] = 3
+            # The former saver option is retired. Keep old files loadable but
+            # normalize them to the single full-quality runtime profile.
+            if raw.get("performance_mode") == "saving":
+                raw["performance_mode"] = "optimal"
             known = {f.name for f in fields(cls)}
             return cls(**{k: v for k, v in raw.items() if k in known}).validate()
         except (OSError, ValueError, TypeError):

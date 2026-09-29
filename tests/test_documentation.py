@@ -19,7 +19,7 @@ def test_readme_1_matches_published_a216201_without_even_a_link_added():
 def test_package_metadata_and_program_use_current_version_and_front_page():
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     assert project["readme"] == "README.md"
-    assert project["version"] == __version__ == "2.7.0"
+    assert project["version"] == __version__ == "3.0.0.dev4"
     assert (ROOT / project["readme"]).is_file()
 
 
@@ -47,3 +47,23 @@ def test_previous_documentation_entry_redirects_without_duplicating_the_guide():
     assert "[README.md](README.md)" in previous
     assert "blob/v2.0.0-dev.7/README-2.0.md" in previous
     assert len(previous.splitlines()) < 20
+
+
+def test_current_prototype_guides_explain_calibration_without_promising_glasses_accuracy():
+    for relative in ("README-3.0.md", "docs/manual/Guia-3.0.md"):
+        guide = (ROOT / relative).read_text(encoding="utf-8")
+        assert __version__ in guide
+        assert "gris mate" in guide and "Fondo: oscuro" in guide
+        assert "cabeza relativamente estable" in guide
+        assert "solo la mirada" in guide
+        assert "20 segundos" in guide
+        assert "error medio" in guide and "máximo" in guide
+        assert "reflejos" in guide and "lentes" in guide
+
+
+def test_v3_pdf_builder_is_explicitly_historical_until_pdf_is_revised():
+    source = (ROOT / "scripts/create_v3_guide.py").read_text(encoding="utf-8")
+    assert "Guía de pruebas · 3.0.0.dev3" in source
+    readme = (ROOT / "README-3.0.md").read_text(encoding="utf-8")
+    assert "PDF y su generador de dev3" in readme
+    assert "no se regeneraron en dev4" in readme

@@ -165,7 +165,7 @@ La inspección automática mediante capturas de ventanas no pudo completarse: la
 
 Quedan por probar físicamente la cámara, luces/distancias, comodidad y falsos positivos, bandeja y atajo global, audio, acciones en aplicaciones reales, desconexiones de dispositivos y monitores con DPI distintos. La ventana fija y sus propiedades se prueban desde Tk; su composición transparente debe revisarse en el escritorio real. Véase la lista de aceptación de `PHASES_1_4.md`.
 
-Esta es una **base local de desarrollo**, no un instalador para Windows limpio, ejecutable firmado ni GitHub Release. La habilitación deliberada y los comandos de la segunda mano continúan pendientes de la fase 5; distinguirla para evitar interferencias ya forma parte del selector actual.
+Esta es una **base local de desarrollo**, no un instalador para Windows limpio, ejecutable firmado ni GitHub Release. La habilitación deliberada y los comandos de la segunda mano ya forman parte de la base actual; su comodidad y cobertura física siguen requiriendo pruebas reales.
 
 ## Repetir la batería completa
 

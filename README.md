@@ -4,6 +4,10 @@
 
 <h1 align="center">Bio-Gesture Control Pro 2.7</h1>
 
+> **Rama de desarrollo 3.0:** este código identifica el prototipo como `3.0.0.dev4`.
+> Consulta [la guía 3.0](README-3.0.md) para el control ocular experimental, el rendimiento óptimo fijo y el nuevo scroll con L.
+> Las descargas y el manual enlazados a continuación corresponden a la edición pública **2.7**, no a este prototipo.
+
 <p align="center">Tu escritorio, tus gestos. Una mano principal y una auxiliar.</p>
 <p align="center"><strong>Desarrollado por Luics415</strong></p>
 

@@ -112,6 +112,26 @@ class GestureTests(unittest.TestCase):
             self.assertEqual(output.state, "PUNTERO", pose)
             self.assertEqual(output.pointer, (sample.landmarks[8].x, sample.landmarks[8].y), pose)
 
+    def test_cursor_source_does_not_remove_existing_primary_hand_commands(self):
+        # Gaze fusion owns pointer selection. Changing the source must not
+        # silently remove right-click, volume, menu or the victory safety cue.
+        for pose in ("pinch", "right", "volume", "thumb", "victory"):
+            with self.subTest(pose=pose):
+                engines = [GestureEngine(Settings(start_paused=False, cursor_mode=mode))
+                           for mode in ("index", "eyes")]
+                for frame in range(70):
+                    now = 10 + frame / 30
+                    sample = hand(pose, now, dy=-min(frame, 15))
+                    self.assertEqual(engines[0].update(sample, now), engines[1].update(sample, now))
+
+    def test_eye_mode_retains_four_sweep_window_gesture(self):
+        self.engine = GestureEngine(Settings(start_paused=False, cursor_mode="eyes"))
+        outputs = []
+        for step, dx in enumerate((0, 60, -5, 60, -5)):
+            now = 10 + step * .15
+            outputs.append(self.engine.update(hand("palm", now, dx=dx), now))
+        self.assertEqual(self.kinds(outputs), ["toggle_window"])
+
     def test_other_extended_fingers_do_not_disable_index_tip_navigation(self):
         sample = hand("palm")
         points = list(sample.landmarks)
@@ -406,24 +426,25 @@ class GestureTests(unittest.TestCase):
         outputs = self.feed("volume", start=10.8, duration=.2, dy=0)
         self.assertLess(next(event.value for output in outputs for event in output.events if event.kind == "volume_delta"), 0)
 
-    def test_scroll_requires_hold_and_rate_is_fps_independent(self):
-        totals = []
-        for fps in (15, 30, 60):
-            self.engine = GestureEngine(self.settings)
-            outputs = self.feed("scroll_up", duration=2.8, fps=fps)
-            self.assertEqual(outputs[0].state, "PREPARANDO SCROLL")
-            self.assertTrue(all(output.pointer is None for output in outputs))
-            totals.append(sum(event.value for output in outputs for event in output.events if event.kind == "scroll"))
-        self.assertLessEqual(max(totals) - min(totals), 1)
-        self.assertGreater(min(totals), 9)
+    def test_legacy_scroll_poses_never_scroll_or_consume_pointer(self):
+        for pose in ("scroll_up", "scroll_down", "fist"):
+            for fps in (15, 30, 60):
+                for handedness in ("Left", "Right"):
+                    with self.subTest(pose=pose, fps=fps, handedness=handedness):
+                        self.engine = GestureEngine(self.settings)
+                        outputs = self.feed(pose, duration=2.8, fps=fps, handedness=handedness)
+                        self.assertFalse(self.kinds(outputs))
+                        self.assertTrue(all(output.state == "PUNTERO" for output in outputs))
+                        self.assertTrue(all(output.pointer is not None for output in outputs))
 
-    def test_bent_pair_scrolls_down_and_ordinary_fist_does_not(self):
-        outputs = self.feed("scroll_down", duration=2.0)
-        steps = [event.value for output in outputs for event in output.events if event.kind == "scroll"]
-        self.assertTrue(steps)
-        self.assertTrue(all(step < 0 for step in steps))
-        self.engine.reset()
-        self.assertNotIn("scroll", self.kinds(self.feed("fist", duration=2.0)))
+    def test_legacy_scroll_poses_still_release_drag_without_extra_actions(self):
+        for pose in ("scroll_up", "scroll_down"):
+            with self.subTest(pose=pose):
+                self.engine = GestureEngine(self.settings)
+                self.feed("pinch", duration=.6)
+                outputs = self.feed(pose, start=10.65, duration=2)
+                self.assertEqual(self.kinds(outputs), ["release_left"])
+                self.assertTrue(all(output.pointer is not None for output in outputs))
 
     def test_menu_opens_without_pointer_and_right_sector_wraps(self):
         outputs = self.feed("thumb", duration=1.0)

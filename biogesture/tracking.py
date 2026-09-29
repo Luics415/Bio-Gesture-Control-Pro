@@ -27,7 +27,7 @@ class TrackingPipeline:
     """
 
     def __init__(self, settings: Settings, model_path: Path, status_callback=None):
-        self.settings = settings
+        self.settings = settings.runtime_settings()
         self.model_path = Path(model_path)
         self.status_callback = status_callback
         self._condition = threading.Condition()
@@ -41,6 +41,9 @@ class TrackingPipeline:
         self._generation = 0
         self._sequence = 0
         self._timestamp_ms = 0
+        self._resting = False
+        self._face_worker = None
+        self._eye_preview_enabled = False
         self._selector = PrincipalHandSelector(settings.tracking_confidence)
         self._metrics = {"capture_fps": 0.0, "inference_ms": 0.0,
                          "dropped_frames": 0.0, "captured_frames": 0.0,
@@ -48,8 +51,9 @@ class TrackingPipeline:
 
     @property
     def running(self):
-        return any(t is not None and t.is_alive()
-                   for t in (self._worker, self._capture_worker))
+        return (any(t is not None and t.is_alive()
+                    for t in (self._worker, self._capture_worker))
+                or bool(self._face_worker and self._face_worker.running))
 
     def start(self):
         if self.running:
@@ -66,6 +70,29 @@ class TrackingPipeline:
     def latest(self):
         with self._condition:
             return self._packet
+
+    def latest_gaze(self):
+        return self._face_worker.latest() if self._face_worker else None
+
+    def latest_eye_preview(self):
+        return self._face_worker.latest_preview() if self._face_worker else None
+
+    def latest_gaze_diagnostics(self):
+        return self._face_worker.latest_diagnostics() if self._face_worker else {}
+
+    def set_eye_preview_enabled(self, enabled):
+        # Serialize the requested state with worker registration. Otherwise a
+        # delayed startup transfer of True could overwrite a later Tk close's
+        # False, retaining eye previews after the preparation window closes.
+        with self._condition:
+            self._eye_preview_enabled = bool(enabled)
+            if self._face_worker:
+                self._face_worker.set_preview_enabled(enabled)
+
+    def set_resting(self, resting):
+        self._resting = bool(resting)
+        if self._face_worker:
+            self._face_worker.set_resting(resting)
 
     def reset_roles(self):
         """User-requested new principal; discard callbacks already in flight."""
@@ -85,6 +112,8 @@ class TrackingPipeline:
         for worker in (self._worker, self._capture_worker):
             if worker and worker is not threading.current_thread():
                 worker.join(max(0.0, deadline - time.monotonic()))
+        if self._face_worker:
+            self._face_worker.stop(max(0.0, deadline - time.monotonic()))
         stopped = not self.running
         self._publish_status("DETENIDO" if stopped else "CERRANDO CÁMARA",
                              None if stopped else "El controlador de cámara está tardando en cerrar")
@@ -129,6 +158,15 @@ class TrackingPipeline:
         try:
             self._publish_status("PREPARANDO DETECCIÓN")
             detector = self._make_detector()
+            if self.settings.cursor_mode == "eyes":
+                from .face_tracking import FaceTrackingWorker
+                face_worker = FaceTrackingWorker(self.settings, self.model_path.with_name("face_landmarker.task"))
+                with self._condition:
+                    self._face_worker = face_worker
+                    face_worker.set_preview_enabled(self._eye_preview_enabled)
+                # Native model loading and thread startup remain outside the
+                # pipeline lock; only registration and the small toggle share it.
+                face_worker.start()
             if self._stop.is_set():
                 return
             self._capture_worker = threading.Thread(target=self._capture_loop,
@@ -150,7 +188,8 @@ class TrackingPipeline:
                     timestamp_ms = self._timestamp_ms
                     self._inflight = (timestamp_ms, frame, now)
                 detector.detect_async(self._image(frame.rgb), timestamp_ms)
-                next_due = now + 1 / self.settings.detection_fps
+                frequency = min(5, self.settings.detection_fps) if self._resting else self.settings.detection_fps
+                next_due = now + 1 / frequency
         except Exception as exc:
             logging.exception("Falló el seguimiento")
             self._publish_status("ERROR DE DETECCIÓN", str(exc))
@@ -162,6 +201,8 @@ class TrackingPipeline:
                 self._condition.notify_all()
             if self._capture_worker:
                 self._capture_worker.join(timeout=2.0)
+            if self._face_worker:
+                self._face_worker.stop(timeout=2.0)
             if detector is not None:
                 try:
                     detector.close()
@@ -178,8 +219,12 @@ class TrackingPipeline:
             self._metrics["captured_frames"] += 1
             self._pending = _Frame(timestamp, rgb, self._generation)
             self._condition.notify_all()
+        if self._face_worker:
+            self._face_worker.offer(rgb, timestamp)
 
     def _invalidate_camera(self, error):
+        if self._face_worker:
+            self._face_worker.invalidate()
         with self._condition:
             self._generation += 1
             self._pending = None
@@ -282,7 +327,8 @@ class TrackingPipeline:
                             with self._condition:
                                 self._metrics["capture_fps"] = count / elapsed
                             count, interval_start = 0, started
-                        if self._stop.wait(max(0.0, 1 / self.settings.capture_fps -
+                        frequency = min(5, self.settings.capture_fps) if self._resting else self.settings.capture_fps
+                        if self._stop.wait(max(0.0, 1 / frequency -
                                                 (time.monotonic() - started))):
                             break
                         ok, frame = cap.read()

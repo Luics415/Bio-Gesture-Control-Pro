@@ -33,7 +33,7 @@ def relaunch_frozen_if_needed(argv):
                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                    creationflags=subprocess.CREATE_NO_WINDOW, close_fds=True)
     command = [str(target), *argv]
-    if any(argument in argv for argument in ("--smoke", "--detector-smoke", "--console")):
+    if any(argument in argv for argument in ("--smoke", "--detector-smoke", "--gaze-smoke", "--console")):
         return subprocess.run(command, check=False, **options).returncode
     subprocess.Popen(command, **options)
     return 0
@@ -45,7 +45,7 @@ def relaunch_if_needed(argv):
     --smoke stays in the caller for test exit codes. --console keeps a developer
     console, but still uses the project's environment when started globally.
     """
-    if os.name != "nt" or getattr(sys, "frozen", False) or any(arg in argv for arg in ("--smoke", "--detector-smoke", "--help", "-h")):
+    if os.name != "nt" or getattr(sys, "frozen", False) or any(arg in argv for arg in ("--smoke", "--detector-smoke", "--gaze-smoke", "--help", "-h")):
         return False
     console = "--console" in argv
     target = PROJECT_ROOT / ".venv" / "Scripts" / ("python.exe" if console else "pythonw.exe")
@@ -86,7 +86,7 @@ def main(argv=None):
         if relaunch_if_needed(argv):
             return 0
     except (OSError, RuntimeError) as exc:
-        if "--detector-smoke" in argv:
+        if any(flag in argv for flag in ("--detector-smoke", "--gaze-smoke")):
             return 1
         if os.name == "nt":
             ctypes.windll.user32.MessageBoxW(None, str(exc), "Bio-Gesture Control Pro", 0x10)

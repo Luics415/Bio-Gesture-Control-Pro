@@ -59,7 +59,7 @@ def test_observed_l_is_accepted_and_all_three_observed_open_palms_are_rejected(e
 
 
 @pytest.mark.parametrize("fps", [15, 30])
-def test_actual_l_near_neutral_has_a_prompt_first_step_not_a_minutes_long_delay(fps):
+def test_actual_l_is_neutral_on_confirmation_then_scrolls_promptly_after_deflection(fps):
     observed = OBSERVED["natural_l"]
     center_y = sum(observed.landmarks[i].y for i in (0, 5, 9, 13, 17)) / 5
     assert .55 < center_y < .551
@@ -69,11 +69,17 @@ def test_actual_l_near_neutral_has_a_prompt_first_step_not_a_minutes_long_delay(
     first_step = None
     for frame in range(fps * 2 + 1):
         now = 10 + frame / fps
-        events = engine.update(replace(observed, timestamp=now), now)
+        sample = observed
+        if now >= 10.7:
+            # Move just beyond the palm-relative neutral band after confirming
+            # at the user's natural position; no image-center assumption.
+            dy = .13 * HandGeometry(observed).scale / observed.height
+            sample = replace(observed, landmarks=tuple(replace(p, y=p.y + dy) for p in observed.landmarks))
+        events = engine.update(replace(sample, timestamp=now), now)
         assert all(event.kind == "scroll" and event.value < 0 for event in events)
         if events and first_step is None:
             first_step = now - 10
-    assert .45 <= first_step <= 1.2
+    assert .7 <= first_step <= 1.4
 
 
 @pytest.mark.parametrize("rotation", [-70, 0, 65])
@@ -126,11 +132,13 @@ def test_l_with_an_extra_extended_finger_is_not_a_scroll_pose(base):
     assert not AuxiliaryGestureEngine._is_l_pose(HandGeometry(replace(sample, landmarks=tuple(points))))
 
 
-@pytest.mark.parametrize("center_y", [.449, .551, .42, .58])
-def test_default_rate_is_responsive_outside_neutral_without_changing_its_boundaries(center_y):
+@pytest.mark.parametrize("offset", [-.121, .121, -.3, .3])
+def test_default_rate_is_responsive_just_outside_the_activation_neutral_band(offset):
     engine = AuxiliaryGestureEngine(Settings())
-    events = l_frames(engine, duration=1.2, center_y=center_y)
-    direction = 1 if center_y < .5 else -1
+    assert not l_frames(engine, center_y=.7)
+    events = l_frames(engine, start=10.65, duration=1.2, center_y=.7,
+                      dy=offset * HandGeometry(l_hand()).scale)
+    direction = 1 if offset < 0 else -1
     assert events and all(event.kind == "scroll" and event.value * direction > 0 for event in events)
 
 

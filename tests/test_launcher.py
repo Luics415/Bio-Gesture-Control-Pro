@@ -95,7 +95,7 @@ def test_missing_environment_is_an_error_not_a_global_fallback(tmp_path, monkeyp
 
 
 @pytest.mark.parametrize("arguments", [["--smoke"], ["--smoke", "--smoke-seconds", "0.1"],
-                                        ["--detector-smoke"], ["--help"], ["-h"]])
+                                        ["--detector-smoke"], ["--gaze-smoke"], ["--help"], ["-h"]])
 def test_smoke_and_help_keep_the_current_process_and_exit_status(tmp_path, monkeypatch, arguments):
     prepared_project(tmp_path, monkeypatch)
     popen = Mock()
@@ -139,7 +139,7 @@ def test_frozen_windowed_relaunches_itself_once_not_python(monkeypatch):
     assert popen.call_count == 1
 
 
-@pytest.mark.parametrize("arguments", [["--smoke"], ["--detector-smoke"], ["--console"]])
+@pytest.mark.parametrize("arguments", [["--smoke"], ["--detector-smoke"], ["--gaze-smoke"], ["--console"]])
 @pytest.mark.parametrize("status", [0, 1, 7])
 def test_frozen_test_mode_waits_and_preserves_failure_status(monkeypatch, arguments, status):
     target = frozen_without_streams(monkeypatch)

@@ -1,5 +1,17 @@
 # Distribución 2.7 · Windows x64
 
+## Portable experimental 3.0.0.dev4
+
+La compilación de desarrollo ahora incluye OpenVINO CPU, los cuatro modelos FP32 de mirada/postura, Face Landmarker, sus licencias, las guías actuales y los avisos legales de `docs/legal`. El conversor OVC y la telemetría no se empaquetan. Los modelos se verifican por tamaño y hash antes de cargar; no se descargan al arrancar.
+
+El constructor también impide importar conversión/telemetría durante el descubrimiento de dependencias de PyInstaller, incluidos sus procesos aislados. Usa un `sitecustomize` exclusivo del entorno del compilador, verificado antes del análisis; no instala nada en Python global, no modifica el consentimiento del usuario y no se incluye en el portable. Esta separación utiliza el [mecanismo de inicio documentado por Python](https://docs.python.org/3.12/library/site.html#sitecustomize) y la [API de procesos aislados de PyInstaller](https://pyinstaller.org/en/v6.22.0/hooks.html#subprocess-isolation-with-pyinstaller-isolated).
+
+El ZIP dev4 se extrae completo y se inicia con `BioGestureControlPro.exe`, sin instalar Python por separado. Los datos personales no están en el ZIP. El README principal y el manual PDF siguen documentando la 2.7 histórica; **para ojos y P/F usa README-3.0.md y docs/manual/Guia-3.0.md**. El paquete dev4 no sustituye ni publica la entrega estable 2.7.
+
+Además del arranque `--smoke`, el compilador ejecuta `--gaze-smoke`: carga e infiere con los modelos reales sobre imágenes sintéticas, sin cámara ni entradas al escritorio y con conexiones bloqueadas. Lo repite desde una carpeta con acento y sin Python en PATH. Consulta `BUILD-MANIFEST.json` del paquete concreto: compilar y superar estos controles no acredita precisión ocular humana, firma digital, instalador ni compatibilidad en una PC limpia.
+
+El resto de este documento conserva las instrucciones y el alcance histórico de 2.7.
+
 La distribución de **2.7.0** es **portable en carpeta**, sin consola y sin Python instalado por separado. No es un EXE suelto ni un instalador firmado. Compilar un paquete no lo publica automáticamente; el estado de publicación se verifica por separado. El resultado concreto de cada compilación queda en su `BUILD-MANIFEST.json` y su archivo `.zip.sha256`.
 
 ## Para usar el paquete

@@ -19,6 +19,7 @@ from PIL import Image, ImageTk
 from . import __version__
 from .auxiliary import AuxiliaryGestureEngine
 from .coordinates import RectMonitor, ScreenMapper, fit_video
+from .legal import open_legal_window
 from .models import ActionEvent, EngineOutput
 from .paths import resource_path
 from .rendering import (ACCENT, BACKGROUND, CAMERA_HEIGHT, FOOTER_HEIGHT, MUTED, TEXT,
@@ -32,6 +33,9 @@ from .windows import list_monitors
 
 CYAN = ACCENT
 GREEN = "#a4d5bd"
+EYE_DISTANCE_HINT = ("Distancia orientativa para empezar: unos 50–70 cm de la cámara. "
+                     "No es una medición ni un rango garantizado: depende de la cámara, la luz y los lentes. "
+                     "Usa tus lentes habituales y evita reflejos directos.")
 CONNECTIONS = ((0, 1), (1, 2), (2, 3), (3, 4), (0, 5), (5, 6), (6, 7), (7, 8),
                (5, 9), (9, 10), (10, 11), (11, 12), (9, 13), (13, 14), (14, 15),
                (15, 16), (13, 17), (0, 17), (17, 18), (18, 19), (19, 20))
@@ -98,10 +102,12 @@ class DesktopApp:
         self._destroyed = False
         self._operation = False
         self._camera_enabled = True
-        self._settings_dialog = self._calibration_dialog = None
+        self._settings_dialog = self._calibration_dialog = self._legal_window = None
         self._diagnostics_visible = False
         self._notice, self._notice_until = "", 0.0
         self._after = None
+        self._gaze_dialog_owner = None
+        self._reset_gaze_session()
         self._build()
         self._apply_window_mode()
         if not smoke:
@@ -111,6 +117,80 @@ class DesktopApp:
     @property
     def closing(self):
         return self._closing
+
+    @property
+    def eyes_mode(self):
+        return getattr(getattr(self, "settings", None), "cursor_mode", "index") == "eyes"
+
+    def _reset_gaze_session(self):
+        self._gaze_prompt_pending = self.eyes_mode
+        self._gaze_drag_grace_until = None
+        self._gaze_loss_reset = False
+        self._gaze_state = self._gaze_observation = None
+        self._gaze_cursor_position = None
+        self._gaze_moved_at = -math.inf
+        self._gaze_session = None
+        if self.eyes_mode:
+            from .gaze import GazeSession
+            from .gaze_pointer import GazePointerMapper
+            from .gaze_precision import create_gaze_calibration
+            self._gaze_session = GazeSession(create_gaze_calibration(self.settings.gaze_engine))
+            # Eye calibration already returns monitor-normalized coordinates;
+            # it must never pass through the index's camera active rectangle.
+            self._gaze_mapper = GazePointerMapper(choose_monitor(self.monitors, self.settings.monitor_id))
+
+    def _update_gaze(self, now):
+        if not self.eyes_mode:
+            return
+        was_ready = bool(self._gaze_state and self._gaze_state.can_act)
+        self._gaze_observation = (self.pipeline.latest_gaze()
+                                  if self.pipeline and self._camera_enabled and not self._operation else None)
+        self._gaze_state = self._gaze_session.update(self._gaze_observation, now)
+        if was_ready and not self._gaze_state.can_act:
+            self._gaze_drag_grace_until = now + .32 if getattr(self.engine, "_left_down", False) else None
+            self._gaze_loss_reset = False
+            self.auxiliary_engine.reset()
+            self._gaze_mapper.reset()
+        if self._gaze_state.can_act:
+            self._gaze_drag_grace_until = None
+            self._gaze_loss_reset = False
+        elif (not self._gaze_loss_reset and not self._gaze_drag_grace_active(now)):
+            released = self.actions.release_all()
+            self.engine.reset(preserve_wave=True)
+            self._gaze_loss_reset = True
+            if released is False:
+                self.pause(True)
+                self.notify(self.actions.last_error or "No se pudo liberar el ratón; control pausado.")
+        if self._gaze_state.paused and not self.engine.paused:
+            self.pause(True)
+        if self.pipeline:
+            packet = getattr(self, "_packet", None)
+            hand_returned = (packet is not None and 0 <= now - packet.captured_at <= .35
+                             and (packet.sample is not None or packet.auxiliary is not None))
+            # A hand returning wakes inference only, never desktop actions.
+            # This gives normal-rate eye samples while victory is being held,
+            # avoiding a low-FPS freshness/recovery deadlock on slower laptops.
+            self.pipeline.set_resting(self._gaze_state.paused and not self._calibration_dialog and not hand_returned)
+
+    def _gaze_drag_grace_active(self, now):
+        deadline = getattr(self, "_gaze_drag_grace_until", None)
+        return (deadline is not None and now < deadline and not self.engine.paused
+                and self._gaze_session.calibration.ready and not self._gaze_session.paused)
+
+    def _move_gaze(self, now):
+        if (not self.eyes_mode or not self._gaze_state or not self._gaze_state.can_act
+                or self.engine.paused or self._operation or self._settings_dialog or self._calibration_dialog
+                or self.output.state in ("MENU", "VOLUMEN") or self._gaze_observation is None
+                or self._gaze_observation.timestamp <= self._gaze_moved_at):
+            return True
+        position = self._gaze_mapper.map(*self._gaze_state.pointer, self._gaze_observation.timestamp)
+        if not self.actions.move(*position):
+            self.pause(True)
+            self.notify(self.actions.last_error or "No se pudo mover el cursor ocular.")
+            return False
+        self._gaze_cursor_position = position
+        self._gaze_moved_at = self._gaze_observation.timestamp
+        return True
 
     def _build(self):
         root = self.root
@@ -163,10 +243,14 @@ class DesktopApp:
         self.more_menu.add_separator()
         self.more_menu.add_command(label="Reelegir mano principal", command=self.reselect_principal)
         self.more_menu.add_command(label="Desactivar mano auxiliar", command=self.toggle_auxiliary)
+        self.more_menu.add_command(label="Calibrar mirada…", command=self.open_gaze_calibration)
+        self.more_menu.add_command(label="Privacidad, términos y cookies", command=self.open_legal)
         self.fixed_button = MenuAction(self.more_menu, 0, {"Normal": "Volver a ventana normal", "Fija": "Fijar ventana transparente"})
         self.camera_button = MenuAction(self.more_menu, 1)
         self.more_button = compact_button(toolbar, "Más  ⋯", self._show_more)
         self.more_button.pack(side="right", padx=(1, 6), pady=2)
+        self.legal_button = compact_button(toolbar, "Privacidad", self.open_legal)
+        self.legal_button.pack(side="right", padx=1, pady=2)
         self.settings_button = compact_button(toolbar, "Ajustes", self.open_settings)
         self.settings_button.pack(side="right", padx=1, pady=2)
         self.pause_button = compact_button(toolbar, "Activar" if self.engine.paused else "Pausar", self.toggle_pause, accent=True)
@@ -217,6 +301,12 @@ class DesktopApp:
             self.more_menu.tk_popup(self.more_button.winfo_rootx(), self.more_button.winfo_rooty() + self.more_button.winfo_height())
         finally:
             self.more_menu.grab_release()
+
+    def open_legal(self):
+        """Show the offline notices without changing camera or control state."""
+        if self._closing:
+            return
+        self._legal_window = open_legal_window(self.root)
 
     def _start_integrations(self):
         try:
@@ -327,6 +417,7 @@ class DesktopApp:
                     return
             if not self._closing:
                 now = time.monotonic()
+                self._update_gaze(now)
                 packet = self.pipeline.latest() if self.pipeline and self._camera_enabled and not self._operation else None
                 if packet is not None and packet.sequence != self._sequence:
                     self._sequence, self._packet = packet.sequence, packet
@@ -352,6 +443,12 @@ class DesktopApp:
                     self._apply_output(self.output, now)
                     self.auxiliary_engine.reset()
                     self.mapper.reset()
+                self._move_gaze(now)
+                if (self.eyes_mode and self._gaze_prompt_pending and self._gaze_observation is not None
+                        and not self._operation and not self._settings_dialog and not self._calibration_dialog
+                        and self.root.winfo_viewable()):
+                    self._gaze_prompt_pending = False
+                    self.open_gaze_calibration()
                 if not self.smoke and now - self._last_monitors >= 3.0:
                     self._last_monitors = now
                     self._refresh_monitors()
@@ -395,9 +492,40 @@ class DesktopApp:
             return
         interrupts = any(event.kind == "pause_changed" or
                          (event.kind == "command" and event.value == "CONFIG") for event in output.events)
+        if self.eyes_mode:
+            # Recovery uses the existing held victory gesture; merely seeing a
+            # face again never leaves the 70-second rest latch.
+            resuming = any(e.kind == "pause_changed" and e.value is False for e in output.events)
+            if resuming:
+                self._gaze_state = self._gaze_session.update(self._gaze_observation, now, victory=True)
+                if not self._gaze_state.can_act:
+                    self.pause(True)
+                    return
+            if not self._gaze_state or not self._gaze_state.can_act:
+                if not self._gaze_drag_grace_active(now):
+                    if self.actions.release_all() is False:
+                        self.pause(True)
+                        self.notify(self.actions.last_error or "No se pudo liberar el ratón; control pausado.")
+                        return
+                for event in output.events:
+                    if event.kind == "release_left":
+                        self._gaze_drag_grace_until = None
+                        if not self.actions.handle(event):
+                            self.pause(True)
+                            self.notify(self.actions.last_error or "No se pudo liberar el arrastre.")
+                            return
+                    elif event.kind == "toggle_window":
+                        self.toggle_window()
+                    elif event.kind == "command" and event.value == "CONFIG":
+                        self.open_settings()
+                    elif event.kind == "pause_changed":
+                        self._update_tray_state()
+                return
+            if not interrupts and not self._move_gaze(now):
+                return
         # Mouse input belongs at this frame's index-tip position, not the
         # previous frame. A down/up pair is a normal click; held down is drag.
-        if output.pointer is not None and not self.engine.paused and not interrupts:
+        if output.pointer is not None and not self.eyes_mode and not self.engine.paused and not interrupts:
             if not self.actions.move(*self.mapper.map(*output.pointer, now)):
                 self.pause(True)
                 self.notify(self.actions.last_error or "No se pudo mover el cursor.")
@@ -422,6 +550,7 @@ class DesktopApp:
         enabled = (self.settings.auxiliary_enabled and not self.engine.paused
                    and not self._operation and self._camera_enabled
                    and not self._settings_dialog and not self._calibration_dialog
+                   and (not self.eyes_mode or bool(self._gaze_state and self._gaze_state.can_act))
                    and self.output.state in ("PUNTERO", "SIN MANO", "LISTO")
                    and not self.output.events)
         events = self.auxiliary_engine.update(sample, now, enabled=enabled)
@@ -463,11 +592,14 @@ class DesktopApp:
         draw_radial_menu(self.canvas, output)
 
     def pause(self, paused=True):
+        self._gaze_drag_grace_until = None
         output = self.engine.set_paused(paused)
         self.output = output
         self.actions.release_all()
         self.auxiliary_engine.reset()
         self.mapper.reset()
+        if self.eyes_mode and hasattr(self, "_gaze_mapper"):
+            self._gaze_mapper.reset()
         self._update_tray_state()
 
     def _update_tray_state(self):
@@ -481,6 +613,13 @@ class DesktopApp:
         if self.engine.paused and (self._operation or not self._camera_enabled or self._settings_dialog or self._calibration_dialog):
             self.notify("Cierra la configuración y enciende la cámara antes de activar.")
             return
+        if self.engine.paused and self.eyes_mode:
+            if not self._gaze_session.calibration.ready:
+                self.open_gaze_calibration()
+                return
+            if not self._gaze_state or not self._gaze_state.can_act:
+                self.notify("Necesitas mirada estable; después del reposo, reanuda con victoria.")
+                return
         self.pause(not self.engine.paused)
 
     def _apply_window_mode(self):
@@ -532,6 +671,7 @@ class DesktopApp:
                 self.pause(True)
                 self.monitors = monitors
                 self.mapper = ScreenMapper(self.settings, choose_monitor(monitors, self.settings.monitor_id))
+                self._reset_gaze_session()
                 self.notify("Las pantallas cambiaron. Revisa el monitor y vuelve a activar.", 12)
         except Exception as exc:
             self.pause(True)
@@ -544,6 +684,7 @@ class DesktopApp:
 
     def _restart_camera(self, restart=True):
         self.pause(True)
+        self._reset_gaze_session()
         self._operation = True
         self.notify("Preparando cámara…")
 
@@ -600,7 +741,11 @@ class DesktopApp:
         viewport.bind("<Configure>", fit_notebook)
         variables = {}
         tabs = {}
-        for name in ("Cámara", "Precisión", "Escritorio", "Diagnóstico"):
+        choice_maps = {"cursor_mode": {"Dedo índice": "index", "Ojos (experimental)": "eyes"},
+                       "gaze_engine": {"Precisión v2 · OpenVINO": "precision-openvino-v2",
+                                       "Personal · OpenVINO": "precision-openvino-v1",
+                                       "Anterior · comparación": "legacy-ridge-v1"}}
+        for name in ("Control", "Cámara", "Precisión", "Escritorio", "Diagnóstico"):
             tabs[name] = ttk.Frame(notebook, padding=12)
             notebook.add(tabs[name], text=name)
 
@@ -609,7 +754,10 @@ class DesktopApp:
             row = len(tab.grid_slaves()) // 2
             ttk.Label(tab, text=label).grid(row=row, column=0, sticky="w", pady=5)
             value = getattr(self.settings, key)
-            variable = tk.BooleanVar(value=value) if type(value) is bool else tk.StringVar(value=str(value))
+            if key in choice_maps:
+                value = next(label for label, stored in choice_maps[key].items() if stored == value)
+            variable = (tk.BooleanVar(master=dialog, value=value) if type(value) is bool
+                        else tk.StringVar(master=dialog, value=str(value)))
             variables[key] = variable
             if type(value) is bool:
                 widget = ttk.Checkbutton(tab, variable=variable)
@@ -619,6 +767,27 @@ class DesktopApp:
                 widget = ttk.Entry(tab, textvariable=variable, width=27)
             widget.grid(row=row, column=1, sticky="ew", padx=(18, 0), pady=5)
             tab.columnconfigure(1, weight=1)
+
+        field("Control", "Mover cursor con", "cursor_mode", tuple(choice_maps["cursor_mode"]))
+        ttk.Label(tabs["Control"], text="Rendimiento").grid(row=1, column=0, sticky="w", pady=5)
+        ttk.Label(tabs["Control"], text="Óptimo (calidad máxima; fijo)").grid(
+            row=1, column=1, sticky="w", padx=(18, 0), pady=5)
+        field("Control", "Motor ocular", "gaze_engine", tuple(choice_maps["gaze_engine"]))
+
+        def release_variables():
+                variables.clear()
+        ttk.Label(tabs["Control"], text="El rendimiento óptimo es permanente para ojos y manos.\n"
+                  "La aplicación conserva la calidad solicitada y no reduce\n"
+                  "la cámara ni desactiva el seguimiento facial.\n\n"
+                  "Ojos: calibración obligatoria por sesión, sin recalibrar al parpadear.\n"
+                  "Tras 70 segundos sin mirada válida: reposo. Reanuda con victoria.\n"
+                  "Es experimental: no identifica al propietario ni garantiza precisión.\n\n"
+                  + EYE_DISTANCE_HINT, wraplength=420, justify="left").grid(
+                      row=3, column=0, columnspan=2, sticky="w", pady=14)
+        ttk.Button(tabs["Control"], text="Calibrar mirada…", command=self.open_gaze_calibration).grid(
+            row=4, column=0, columnspan=2, sticky="w", pady=8)
+        ttk.Label(tabs["Control"], text="Guarda primero si acabas de cambiar el modo o la cámara.",
+                  wraplength=420).grid(row=5, column=0, columnspan=2, sticky="w")
 
         for label, key, options in (
             ("Índice de cámara (0–16)", "camera_index", None),
@@ -635,6 +804,8 @@ class DesktopApp:
             ("Cierre de pinza / palma", "pinch_close"), ("Apertura de pinza / palma", "pinch_open"),
             ("Indicador de arrastre (s)", "drag_hold"), ("Suavizado en reposo", "min_cutoff"),
             ("Respuesta al movimiento", "filter_beta"), ("Velocidad de desplazamiento", "scroll_rate"),
+            ("L: zona neutra / palma", "auxiliary_scroll_dead_zone"),
+            ("L: sensibilidad", "auxiliary_scroll_sensitivity"),
             ("Sensibilidad de volumen", "volume_sensitivity"), ("Invertir horizontal", "invert_x"),
             ("Invertir vertical", "invert_y"),
         ):
@@ -654,7 +825,8 @@ class DesktopApp:
                   "Auxiliar, pinzas con el pulgar (mantener 0.45 s):\n"
                   "Índice: copiar · Corazón: pegar\nAnular: deshacer · Meñique: rehacer\n"
                   "L (pulgar e índice): mantener 0.45 s; subir/bajar desplaza.\n"
-                  "Volver al centro o soltar la L detiene el desplazamiento.\n"
+                  "Arriba/abajo del inicio: scroll continuo; abrir la mano lo detiene.\n"
+                  "Índice y corazón juntos, pulgar recogido: Vista de tareas (0.65 s).\n"
                   "La aplicación activa decide qué puede copiar o deshacer.\n\n"
                   "El modelo funciona localmente. No se guardan fotos ni video.\n\n"
                   "La pausa conserva la detección para reanudar con victoria.\n"
@@ -677,9 +849,12 @@ class DesktopApp:
                 calibration = self._calibration_dialog
                 self._calibration_dialog = None
                 calibration.destroy()
+            release_variables()
             dialog.destroy()
 
         def on_destroy(event):
+            if event.widget is dialog:
+                release_variables()
             if event.widget is dialog and self._settings_dialog is dialog:
                 self._settings_dialog = None
                 self._diagnostics_visible = False
@@ -696,8 +871,14 @@ class DesktopApp:
                 changes = {}
                 for key, variable in variables.items():
                     previous = getattr(self.settings, key)
-                    changes[key] = type(previous)(variable.get())
-                candidate = replace(self.settings, **changes).validate()
+                    changes[key] = (choice_maps[key][variable.get()] if key in choice_maps
+                                    else type(previous)(variable.get()))
+                candidate = replace(self.settings, performance_mode="optimal", **changes).validate()
+                restart_keys = ("camera_index", "capture_width", "capture_height", "capture_fps", "detection_fps",
+                                "mirror", "detection_confidence", "tracking_confidence", "cursor_mode",
+                                "gaze_engine")
+                restart = any(getattr(candidate, key) != getattr(self.settings, key) for key in restart_keys)
+                monitor_changed = candidate.monitor_id != self.settings.monitor_id
                 if not self.smoke:
                     candidate.save()
                 self.settings = candidate
@@ -708,7 +889,13 @@ class DesktopApp:
                 self.mapper = ScreenMapper(candidate, choose_monitor(self.monitors, candidate.monitor_id))
                 self._apply_window_mode()
                 close_dialog()
-                self._restart_camera(True)
+                if restart:
+                    self._restart_camera(True)
+                elif monitor_changed:
+                    self._reset_gaze_session()
+                elif self.eyes_mode:
+                    from .gaze_pointer import GazePointerMapper
+                    self._gaze_mapper = GazePointerMapper(choose_monitor(self.monitors, candidate.monitor_id))
             except (ValueError, TypeError, OSError, tk.TclError) as exc:
                 messagebox.showerror("Revisa la configuración", str(exc), parent=dialog)
 
@@ -736,6 +923,73 @@ class DesktopApp:
             os.startfile(directory)
         except OSError as exc:
             messagebox.showerror("Diagnóstico", str(exc), parent=self._settings_dialog or self.root)
+
+    def open_gaze_calibration(self):
+        if self._closing:
+            return
+        self.pause(True)
+        if not self.eyes_mode:
+            messagebox.showinfo("Mirada", "Selecciona Ojos (experimental) y guarda en Ajustes → Control.",
+                                parent=self._settings_dialog or self.root)
+            return
+        if self._operation or not self._camera_enabled:
+            self.notify("Espera a que la cámara esté lista para calibrar.")
+            return
+        if self.settings.monitor_id == "virtual":
+            messagebox.showinfo("Mirada", "La primera versión ocular calibra un monitor. Elige uno en Ajustes.",
+                                parent=self._settings_dialog or self.root)
+            return
+        if self._calibration_dialog:
+            self._calibration_dialog.lift()
+            return
+        from .gaze_ui import GazeCalibrationDialog
+        from .gaze_precision import gaze_calibration_type
+        self._reset_gaze_session()
+        if self.pipeline:
+            self.pipeline.set_resting(False)
+
+        def complete(calibration):
+            from .gaze import GazeSession
+            self._gaze_session = GazeSession(calibration)
+            self._gaze_state = None
+            self._gaze_mapper.reset()
+            self.notify("Calibración validada. Cierra Ajustes y activa con victoria o el botón.", 15)
+
+        def close():
+            if self.pipeline:
+                self.pipeline.set_eye_preview_enabled(False)
+            self._calibration_dialog = None
+            self._gaze_dialog_owner = None
+            self._gaze_prompt_pending = False
+
+        def export_diagnostics(payload):
+            from .gaze_export import save_gaze_diagnostic
+            # Only the wizard's explicit export action invokes this callback.
+            return save_gaze_diagnostic(payload, data_directory() / "diagnostics" / "gaze")
+
+        runtime = self.settings.runtime_settings()
+        monitor = choose_monitor(self.monitors, self.settings.monitor_id)
+
+        def latest_diagnostics():
+            return {
+                "camera": {"requested_width": runtime.capture_width, "requested_height": runtime.capture_height,
+                           "requested_fps": runtime.capture_fps, "requested_detection_fps": runtime.detection_fps,
+                           "mirror": runtime.mirror},
+                "monitor": {"width": monitor.width, "height": monitor.height,
+                            "left": monitor.left, "top": monitor.top},
+                "worker": self.pipeline.latest_gaze_diagnostics() if self.pipeline else {},
+            }
+
+        owner = GazeCalibrationDialog(self.root, monitor,
+                                      lambda: self.pipeline.latest_gaze() if self.pipeline else None,
+                                      complete, close,
+                                      calibration_factory=gaze_calibration_type(self.settings.gaze_engine),
+                                      latest_preview=lambda: self.pipeline.latest_eye_preview() if self.pipeline else None,
+                                      set_preview_enabled=lambda enabled: self.pipeline.set_eye_preview_enabled(enabled)
+                                      if self.pipeline else None,
+                                      latest_diagnostics=latest_diagnostics, on_export_diagnostics=export_diagnostics)
+        self._gaze_dialog_owner = owner
+        self._calibration_dialog = owner.window
 
     def open_calibration(self):
         self.pause(True)

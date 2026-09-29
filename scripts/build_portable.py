@@ -22,14 +22,24 @@ import zipfile
 
 APP_NAME = "BioGestureControlPro"
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 MODEL_SHA256 = "fbc2a30080c3c557093b5ddfc334698132eb341044ccee322ccf8bcf3607cde1"
 BUILD_TOOLS = {"pyinstaller": "6.22.2", "pyinstaller-hooks-contrib": "2026.7"}
-PUBLIC_FILES = ("README.md", "README-2.0.md", "legacy/v1.20.36/README.md", "LICENSE", "THIRD_PARTY_NOTICES.md",
+GAZE_RUNTIME = {"openvino": "2024.6.0", "openvino-telemetry": "2025.2.0"}
+OPENVINO_DLLS = ("openvino.dll", "openvino_intel_cpu_plugin.dll", "openvino_ir_frontend.dll",
+                "tbb12.dll", "tbbbind_2_5.dll", "tbbmalloc.dll", "tbbmalloc_proxy.dll")
+PUBLIC_FILES = ("README.md", "README-2.0.md", "README-3.0.md", "legacy/v1.20.36/README.md", "LICENSE", "SECURITY.md", "THIRD_PARTY_NOTICES.md",
                 "docs/GESTURES.md", "docs/ARCHITECTURE.md", "docs/PHASES_1_4.md", "docs/DEVELOPMENT.md",
-                "docs/DISTRIBUTION.md", "docs/VALIDATION.md", "docs/captures/README.md")
+                "docs/DISTRIBUTION.md", "docs/VALIDATION.md", "docs/DELIVERY_DEV7.md", "docs/captures/README.md",
+                "docs/PRECISION_OCULAR.md", "docs/DIAGNOSTICO_OCULAR.md", "docs/manual/Guia-3.0.md",
+                "docs/ASSETS_RIGHTS.md",
+                "docs/legal/README.md", "docs/legal/PRIVACIDAD.md", "docs/legal/TERMINOS.md",
+                "docs/legal/COOKIES.md")
 PUBLIC_ASSET_MAP = {"docs/manual/Manual-de-usuario.pdf": "Manual-de-usuario.pdf"}
 MANUAL_BUILDER = "scripts/create_user_manual.py"
 MANUAL_DEPENDENCIES = ("scripts/manual_hands.py",)
+BUILD_SUPPORT = "packaging/build_support/sitecustomize.py"
 FORBIDDEN_PARTS = {".git", ".venv", "venv", "output", "local-signing", ".env", "__pycache__"}
 FORBIDDEN_NAMES = {"settings.json", "native.log", "biogesture.log"}
 
@@ -62,9 +72,71 @@ def numeric_version(version):
 
 
 def required_assets():
-    return ("assets/models/hand_landmarker.task", "assets/models/README.md", "assets/brand/app.ico",
+    from biogesture.gaze_neural import MODEL_ASSETS
+    return ("assets/models/hand_landmarker.task", "assets/models/face_landmarker.task", "assets/models/README.md", "assets/brand/app.ico",
             "assets/brand/anchor-approved.png", "assets/brand/splash-author.png", "assets/brand/tray.png",
-            "assets/brand/README.md")
+            "assets/brand/README.md", "assets/models/OPENVINO-LICENSE.txt",
+            *("assets/models/gaze-precision/" + asset.filename for asset in MODEL_ASSETS))
+
+
+def openvino_runtime_inputs():
+    """Discover only local IR/CPU inference files, without importing OpenVINO.
+
+    Importing the vendor root during build can start its optional converter's
+    telemetry. Reading wheel metadata avoids executing it at collection time.
+    Conversion frontends and accelerator plugins are not required by our CPU IR.
+    """
+    distribution = metadata.distribution("openvino")
+    package = Path(distribution.locate_file("openvino"))
+    binaries = []
+    for name in OPENVINO_DLLS:
+        source = package / "libs" / name
+        if not source.is_file():
+            raise FileNotFoundError(f"Falta la biblioteca ocular bloqueada: {name}")
+        binaries.append((str(source), "openvino/libs"))
+    modules = []
+    skip = {"tools", "torch", "torchvision", "cmake", "include", "lib", "libs", "__pycache__"}
+    for source in package.rglob("*.py"):
+        parts = source.relative_to(package).with_suffix("").parts
+        if set(parts) & skip or (parts[0] == "frontend" and len(parts) > 2):
+            continue
+        module_parts = parts[:-1] if parts[-1] == "__init__" else parts
+        modules.append(".".join(("openvino", *module_parts)))
+    return binaries, sorted(set(modules))
+
+
+def build_environment(stage, root=ROOT):
+    """Scope startup exclusions to the compiler and its subprocesses only."""
+    environment = os.environ.copy()
+    environment.pop("PYTHONHOME", None)
+    environment["PYTHONPATH"] = str((Path(root) / BUILD_SUPPORT).parent.resolve())
+    environment["PYTHONNOUSERSITE"] = "1"
+    environment["BIOGESTURE_BUILD_RUNTIME_ONLY"] = "1"
+    environment["BIOGESTURE_BUILD_STAGE"] = str(stage)
+    environment["PYTHONHASHSEED"] = "0"
+    environment["MPLBACKEND"] = "Agg"
+    return environment
+
+
+def verify_build_import_exclusions(root=ROOT):
+    """Fail closed if compiler or isolated workers missed our startup guard.
+
+    The documented sitecustomize mechanism runs before vendor discovery. This
+    check uses PyInstaller's public isolated API, without modifying its code.
+    """
+    from PyInstaller import isolated
+
+    def inspect_startup():
+        import sys
+        module = sys.modules.get("sitecustomize")
+        blocked = all(name in sys.modules and sys.modules[name] is None
+                      for name in ("openvino.tools", "openvino_telemetry"))
+        return getattr(module, "__file__", ""), blocked
+
+    expected = (Path(root) / BUILD_SUPPORT).resolve()
+    for filename, blocked in (inspect_startup(), isolated.call(inspect_startup)):
+        if not blocked or not filename or Path(filename).resolve() != expected:
+            raise RuntimeError("Falta el aislamiento de conversión/telemetría al compilar")
 
 
 def pinned_packages(path):
@@ -118,7 +190,8 @@ def source_snapshot(root=ROOT):
     root = Path(root).resolve()
     paths = [root / "control.py", root / "pyproject.toml", root / "packaging/BioGestureControlPro.spec",
              root / "scripts/build_portable.py", root / "scripts/build-portable.ps1",
-             root / "requirements.lock.txt", root / "requirements-build.lock.txt", root / MANUAL_BUILDER]
+             root / "requirements.lock.txt", root / "requirements-build.lock.txt",
+             root / "requirements-gaze.lock.txt", root / MANUAL_BUILDER, root / BUILD_SUPPORT]
     paths += list((root / "biogesture").glob("*.py"))
     paths += [root / name for name in MANUAL_DEPENDENCIES]
     paths += [root / name for name in (*required_assets(), *PUBLIC_FILES)]
@@ -139,6 +212,13 @@ def check_environment(root=ROOT):
     for name, version in BUILD_TOOLS.items():
         if pins.get(name) != version:
             raise RuntimeError(f"Herramienta sin la versión esperada: {name}")
+    gaze_pins = pinned_packages(root / "requirements-gaze.lock.txt")
+    if gaze_pins != GAZE_RUNTIME:
+        raise RuntimeError("El complemento ocular no coincide con las versiones esperadas")
+    for name, version in gaze_pins.items():
+        if metadata.version(name) != version:
+            raise RuntimeError(f"Falta el complemento ocular bloqueado: {name}; ejecuta build-portable.ps1 -InstallBuildTools")
+    pins.update(gaze_pins)
     if sha256(root / "assets/models/hand_landmarker.task") != MODEL_SHA256:
         raise RuntimeError("La integridad del modelo local no coincide")
     # This only discovers Tcl/Tk; it creates no window and touches no camera.
@@ -146,6 +226,12 @@ def check_environment(root=ROOT):
     if not tkinter.TclVersion or not tkinter.TkVersion:
         raise RuntimeError("El intérprete de compilación necesita Tcl/Tk")
     source_snapshot(root)
+    from biogesture.face_tracking import FACE_MODEL_SHA256
+    from biogesture.gaze_neural import verified_model_bytes
+    if sha256(root / "assets/models/face_landmarker.task") != FACE_MODEL_SHA256:
+        raise RuntimeError("La integridad del modelo facial local no coincide")
+    verified_model_bytes(root / "assets/models/gaze-precision")
+    openvino_runtime_inputs()
     return pins
 
 
@@ -249,6 +335,11 @@ def validate_bundle(bundle, root=ROOT):
             raise ValueError(f"Manual PDF modificado durante el empaquetado: {destination}")
     if not (internal / "licenses/PYTHON-LICENSE.txt").is_file():
         raise ValueError("Faltan las licencias incluidas")
+    for name in OPENVINO_DLLS:
+        if not (internal / "openvino/libs" / name).is_file():
+            raise ValueError(f"Falta el runtime ocular integrado: {name}")
+    if (internal / "openvino_telemetry").exists() or (internal / "openvino/tools/ovc").exists():
+        raise ValueError("El portable no debe incluir el conversor ocular ni la telemetría")
     return portable_members(bundle)
 
 
@@ -285,6 +376,23 @@ def validate_detector_report(report, expected_version):
         raise RuntimeError("El informe del detector no confirma versión/modelo/plataforma e inferencia esperados")
 
 
+def validate_gaze_report(report, expected_version):
+    from biogesture.face_tracking import FACE_MODEL_SHA256
+    from biogesture.gaze_neural import MODEL_ASSETS
+    if (report.get("ok") is not True or report.get("version") != expected_version
+            or report.get("frozen") is not True or report.get("frames") != 3
+            or report.get("features") != 6 or report.get("error") is not None
+            or report.get("platform") != "Windows" or report.get("architecture", "").lower() not in ("amd64", "x86_64")
+            or not str(report.get("python", "")).startswith("3.12.")
+            or not str(report.get("runtime", "")).startswith(GAZE_RUNTIME["openvino"])
+            or report.get("converter_loaded") is not False or report.get("telemetry_loaded") is not False
+            or report.get("network_attempts") != 0 or report.get("camera_opened") is not False
+            or report.get("system_input") is not False or report.get("accuracy_validation") != "not_measured"
+            or report.get("models_sha384") != {a.filename: a.sha384 for a in MODEL_ASSETS}
+            or report.get("face_detector") != {"frames": 1, "detected_faces": 0, "model_sha256": FACE_MODEL_SHA256}):
+        raise RuntimeError("El informe ocular no confirma modelos, runtime local e inferencia congelada esperados")
+
+
 def run_smoke(executable, stage):
     environment = os.environ.copy()
     for name in ("PYTHONHOME", "PYTHONPATH", "BIOGESTURE_RELAUNCH_TARGET", "BIOGESTURE_FROZEN_STDIO_READY"):
@@ -298,6 +406,7 @@ def run_smoke(executable, stage):
                                            str(Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32")))
     results = {}
     for name, arguments in (("detector", ["--detector-smoke"]),
+                            ("gaze", ["--gaze-smoke"]),
                             ("desktop", ["--smoke", "--smoke-seconds", ".3"])):
         return_code = run_probe([str(executable), *arguments], cwd=stage, environment=environment)
         if return_code:
@@ -306,6 +415,10 @@ def run_smoke(executable, stage):
         if name == "detector":
             report = json.loads((smoke_directory / "detector-smoke.json").read_text(encoding="utf-8"))
             validate_detector_report(report, application_version())
+            results[name]["report"] = report
+        elif name == "gaze":
+            report = json.loads((smoke_directory / "gaze-smoke.json").read_text(encoding="utf-8"))
+            validate_gaze_report(report, application_version())
             results[name]["report"] = report
     return results
 
@@ -386,10 +499,7 @@ def build(root=ROOT):
     output_name = f"{APP_NAME}-{version}-windows-x64-{run_id}"
     distribution = root / "dist" / output_name
     distribution.mkdir(parents=True, exist_ok=False)
-    environment = os.environ.copy()
-    environment["BIOGESTURE_BUILD_STAGE"] = str(stage)
-    environment["PYTHONHASHSEED"] = "0"
-    environment["MPLBACKEND"] = "Agg"
+    environment = build_environment(stage, root)
     subprocess.run([sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean",
                     "--workpath", str(stage / "pyinstaller"), "--distpath", str(distribution),
                     str(root / "packaging/BioGestureControlPro.spec")], cwd=root, env=environment, check=True)

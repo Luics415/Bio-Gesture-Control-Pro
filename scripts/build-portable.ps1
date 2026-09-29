@@ -16,6 +16,10 @@ try {
     if ($InstallBuildTools) {
         & $buildPython -m pip --disable-pip-version-check install --index-url https://pypi.org/simple --require-hashes --only-binary=:all: -r (Join-Path $projectRoot 'requirements-build.lock.txt')
         if ($LASTEXITCODE -ne 0) { throw 'No se pudieron instalar las herramientas bloqueadas de empaquetado.' }
+        & $buildPython -m pip --disable-pip-version-check install --index-url https://pypi.org/simple --no-deps --require-hashes --only-binary=:all: -r (Join-Path $projectRoot 'requirements-gaze.lock.txt')
+        if ($LASTEXITCODE -ne 0) { throw 'No se pudo instalar el complemento ocular bloqueado.' }
+        & $buildPython -m pip check
+        if ($LASTEXITCODE -ne 0) { throw 'Las dependencias de empaquetado no son coherentes.' }
     }
     $buildArguments = @((Join-Path $PSScriptRoot 'build_portable.py'))
     if ($CheckOnly) { $buildArguments += '--check' }

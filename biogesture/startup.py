@@ -141,6 +141,7 @@ def parse_arguments(argv=None):
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--smoke", action="store_true", help="Prueba de interfaz sin cámara ni entradas reales")
     mode.add_argument("--detector-smoke", action="store_true", help="Prueba del modelo con una imagen sintética, sin cámara")
+    mode.add_argument("--gaze-smoke", action="store_true", help="Prueba ocular local con píxeles sintéticos, sin cámara ni control")
     parser.add_argument("--smoke-seconds", type=float, default=3.0)
     parser.add_argument("--console", action="store_true", help="Conservar salida de consola para diagnóstico de desarrollo")
     visuals = parser.add_mutually_exclusive_group()
@@ -169,7 +170,7 @@ def recovery_instructions():
 
 def main(argv=None):
     args = parse_arguments(argv)
-    if args.smoke:
+    if args.smoke or args.gaze_smoke:
         configure_smoke_data_directory()
     setup_logging()
     if not args.console and not args.smoke:
@@ -178,6 +179,10 @@ def main(argv=None):
         from .detector_smoke import run_detector_smoke
         return run_detector_smoke(resource_path("assets/models/hand_landmarker.task"), MODEL_SHA256,
                                   data_directory() / "detector-smoke.json", console=args.console)
+    if args.gaze_smoke:
+        from .gaze_smoke import run_gaze_smoke
+        return run_gaze_smoke(resource_path("assets/models"), data_directory() / "gaze-smoke.json",
+                              console=args.console)
     logging.info("Inicio de aplicación; prueba sin dispositivos=%s", args.smoke)
     logging.info("Intérprete=%s; entorno=%s; consola de desarrollo=%s", sys.executable, sys.prefix, args.console)
     from .windows import enable_dpi_awareness
@@ -285,7 +290,7 @@ def run(argv=None):
         return main(argv)
     except Exception as exc:
         logging.exception("Fallo antes de completar el arranque")
-        if "--detector-smoke" in (sys.argv[1:] if argv is None else argv):
+        if any(flag in (sys.argv[1:] if argv is None else argv) for flag in ("--detector-smoke", "--gaze-smoke")):
             return 1
         text = (f"No se pudo iniciar Bio-Gesture Control Pro.\n\n{exc}\n\n"
                 f"{recovery_instructions()}")
