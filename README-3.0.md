@@ -32,7 +32,7 @@ En **Ajustes → Control**, selecciona **Mover cursor con**. El rendimiento ópt
 - **Ojos:** necesita cámara activa y un monitor concreto; todavía no calibra el escritorio virtual de varios monitores.
 - **Rendimiento óptimo fijo:** ojos y manos utilizan siempre la calidad solicitada; ya no existe un selector que reduzca cámara o desactive el seguimiento facial.
 
-**Motor ocular → Precisión v2 · OpenVINO** selecciona esta revisión. **Personal · OpenVINO** conserva v1 (13 + 9 objetivos) y **Anterior · comparación** conserva el estimador solo geométrico. Una configuración existente mantiene su elección: selecciona v2 expresamente para probar la nueva calibración. Cambiar de motor descarta la calibración anterior. La elección no modifica gestos, roles, clics, arrastre ni comandos auxiliares.
+El único motor ocular disponible es **Precisión v2 · OpenVINO**. Las etiquetas de motores anteriores solo permanecen en el lector de diagnósticos históricos; ya no aparecen en Ajustes ni pueden seleccionarse para una sesión nueva. Cambiar entre índice y ojos descarta la calibración ocular de la sesión. Esta decisión no modifica gestos, roles, clics, arrastre ni comandos auxiliares.
 
 ### Motor personal de precisión
 

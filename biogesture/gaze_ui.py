@@ -27,6 +27,18 @@ WIZARD_PALETTES = {
     "neutral": {"background": "#aeb5bb", "text": "#17242d", "muted": "#33434e", "accent": "#075663"},
     "dark": {"background": "#242b33", "text": "#edf2f5", "muted": "#b6c2cb", "accent": "#79d8dc"},
 }
+# Static, high-contrast target colours. The sequence repeats for longer
+# protocols; changing colour happens only when the target changes, never on a
+# timer, so it attracts attention without adding animation or CPU work.
+CALIBRATION_TARGET_COLORS = (
+    "#ef4444",  # rojo
+    "#facc15",  # amarillo
+    "#22c55e",  # verde
+    "#3b82f6",  # azul
+    "#94a3b8",  # gris
+    "#a855f7",  # morado
+    "#ec4899",  # rosa
+)
 
 
 class CalibrationCollector:
@@ -431,6 +443,10 @@ class GazeCalibrationDialog:
                 self.window.bind(f"<KeyPress-{key}>", lambda event: self.export_diagnostics())
             for key in ("f", "F"):
                 self.window.bind(f"<KeyPress-{key}>", lambda event: self.toggle_probe_filter())
+            for key in ("u", "U"):
+                self.window.bind(f"<KeyPress-{key}>", lambda event: self.accept_calibration())
+            self.window.bind("<Return>", lambda event: self.accept_calibration())
+            self.window.bind("<KP_Enter>", lambda event: self.accept_calibration())
             self.window.bind("<Destroy>", self._window_destroyed)
             self.canvas = tk.Canvas(self.window, background=self.palette["background"], highlightthickness=0)
             self.canvas.pack(fill="both", expand=True)
@@ -438,6 +454,8 @@ class GazeCalibrationDialog:
             self._buttons.place(relx=1.0, rely=1.0, x=-14, y=-10, anchor="se")
             self.start_button = compact_button(self._buttons, "Iniciar", self.start, accent=True)
             self.start_button.pack(side="left", padx=7)
+            self.accept_button = compact_button(self._buttons, "Aceptar y desbloquear control · Enter",
+                                                self.accept_calibration, accent=True)
             self.background_button = compact_button(self._buttons, "Fondo: gris mate", self.toggle_background)
             self.background_button.pack(side="left", padx=7)
             compact_button(self._buttons, "Cancelar · Esc", self.destroy).pack(side="left", padx=7)
@@ -484,6 +502,23 @@ class GazeCalibrationDialog:
             self._paint()
         else:
             self.destroy()
+
+    def accept_calibration(self):
+        if self._closed or not self._results_visible():
+            return
+        calibration = self.collector.calibration
+        if calibration is not None and getattr(calibration, "fitted", False):
+            if hasattr(calibration, "unlock"):
+                calibration.unlock()
+            else:
+                calibration.ready = True
+            self.collector.phase = "complete"
+            self.collector.message = "Calibración aceptada. Control desbloqueado."
+            self._delivered = True
+            try:
+                self._on_success(calibration)
+            finally:
+                self.destroy()
 
     def toggle_details(self):
         if self._closed or getattr(self, "_probe", False):
@@ -710,6 +745,11 @@ class GazeCalibrationDialog:
                 self._diagnostic_buttons.place_forget()
             else:
                 self._diagnostic_buttons.place(relx=1.0, rely=1.0, x=-14, y=-43, anchor="se")
+        if hasattr(self, "accept_button"):
+            if self._results_visible():
+                self.accept_button.pack(side="left", padx=7, before=self.start_button)
+            else:
+                self.accept_button.pack_forget()
         width, height = self.monitor.width, self.monitor.height
         self.start_button.configure(state="disabled" if collector.running or probe else "normal",
                                     text=("Iniciar" if collector.phase == "idle" else
@@ -728,12 +768,9 @@ class GazeCalibrationDialog:
             # Escape is still bound globally for cancellation.
             x, y = collector.target
             x, y = x * (width - 1), y * (height - 1)
-            canvas.create_oval(x - 17, y - 17, x + 17, y + 17, outline=palette["accent"], width=2)
-            # Alternate the centre between two high-contrast static colours.
-            # It changes only when the target changes, never on a timer, so it
-            # attracts attention without adding animation or CPU work.
-            center_color = palette["text"] if collector.point_index % 2 == 0 else palette["accent"]
-            canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill=center_color, outline="")
+            target_color = CALIBRATION_TARGET_COLORS[collector.point_index % len(CALIBRATION_TARGET_COLORS)]
+            canvas.create_oval(x - 17, y - 17, x + 17, y + 17, outline=target_color, width=2)
+            canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill=target_color, outline="")
             if detail:
                 self._paint_live_details()
         elif detail:
@@ -781,7 +818,7 @@ class GazeCalibrationDialog:
         width, height = self.monitor.width, self.monitor.height
         report = self.diagnostic_report()
         measured = self.collector.calibration.report
-        canvas.create_text(width / 2, 30, text="⚓  Resultado de la comprobación · control bloqueado",
+        canvas.create_text(width / 2, 30, text="⚓  Resultado de la comprobación · Precisión adaptada",
                            fill=palette["accent"], font=("Segoe UI", -20))
         def percent(value):
             return f"{value:.1%}" if self.collector._valid_time(value) else "no disponible"
@@ -790,12 +827,12 @@ class GazeCalibrationDialog:
         canvas.create_text(24, 65, text=(f"Error medio {percent(measured.mean_error)} · máximo {percent(measured.max_error)}. "
                                        f"Límites: {percent(limits['mean_error'])} / {percent(limits['max_error'])}. "
                                        f"Muestras sin predicción: {rejected}."),
-                           fill=palette["text"], anchor="nw", width=width - 48, font=("Segoe UI", -13))
+                            fill=palette["text"], anchor="nw", width=width - 48, font=("Segoe UI", -13))
         reason = str(measured.reason or self.collector.message).replace("\n", " ")
         canvas.create_text(24, 105, text=f"Motivo: {reason[:180]}{'…' if len(reason) > 180 else ''}",
-                           fill=palette["muted"], anchor="nw", width=width - 48, font=("Segoe UI", -12))
+                            fill=palette["muted"], anchor="nw", width=width - 48, font=("Segoe UI", -12))
         canvas.create_text(24, 144, text="○ Objetivo   × Mirada media estimada   — Desviación (distancia normalizada, no aciertos)",
-                           fill=palette["muted"], anchor="nw", width=width - 48, font=("Segoe UI", -12))
+                            fill=palette["muted"], anchor="nw", width=width - 48, font=("Segoe UI", -12))
         map_width = min(width * .55, (height - 355) * width / height)
         map_height = map_width * height / width
         left, top = 28, 174
@@ -823,9 +860,9 @@ class GazeCalibrationDialog:
         canvas.create_text(table_left, top, text="\n".join(lines), anchor="nw", justify="left",
                            width=max(160, width - table_left - 20), fill=palette["text"], font=("Segoe UI", -12))
         canvas.create_text(24, top + map_height + 20,
-                           text=("D: inspeccionar iris, postura y adquisición. P: visualizar el modelo sin controlar la PC.\n"
-                                 "E: guardar informe local con datos numéricos de esta prueba, sin fotos ni video.\n"
-                                 "Las pruebas sintéticas no demuestran precisión real: este mapa permite investigarla."),
+                           text=("Enter: Aceptar y desbloquear control para usar el ratón en el escritorio.\n"
+                                 "D: inspeccionar iris, postura y adquisición. P: visualizar el modelo sin controlar la PC.\n"
+                                 "E: guardar informe local con datos numéricos. Reintentar todo: repetir captura."),
                            anchor="nw", width=width - 48, fill=palette["muted"], font=("Segoe UI", -12))
 
     def _paint_technical(self):

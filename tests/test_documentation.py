@@ -23,15 +23,11 @@ def test_package_metadata_and_program_use_current_version_and_front_page():
     assert (ROOT / project["readme"]).is_file()
 
 
-def test_splash_original_is_archived_and_current_has_requested_version_edit():
-    assert hashlib.sha256((ROOT / "assets/brand/splash-author-2.0.png").read_bytes()).hexdigest() == (
-        "8a499e2225eadfd0cbc7df5be9a706878c7f3af882935bd00e20ecf06be02020"
-    )
+def test_only_current_splash_is_distributed_and_has_requested_version_edit():
+    assert not (ROOT / "assets/brand/splash-author-2.0.png").exists()
+    assert not (ROOT / "assets/brand/splash-author-2.7.png").exists()
     assert hashlib.sha256((ROOT / "assets/brand/splash-author.png").read_bytes()).hexdigest() == (
         "cc4b90b98228a07cb54fb95231bd7de65e0ad40c8817d7c5ab216049bfd996d9"
-    )
-    assert hashlib.sha256((ROOT / "assets/brand/splash-author-2.7.png").read_bytes()).hexdigest() == (
-        "6f6d427ad02b1cb11f0c09195c92a0a38c095b78427b87e4fead4e2adcc45924"
     )
 
 

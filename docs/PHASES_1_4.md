@@ -61,8 +61,8 @@ La firma visual de autor del splash ya es parte del diseño. La firma digital de
 
 ## Documentación y limpieza
 
-El README publicado de 1.0 se conserva byte por byte en `legacy/v1.20.36/README.md`, sin añadirle enlaces. La portada y descripción del paquete pasan a `README.md`, dedicadas a 2.7 con descarga del portable y PDF. `README-2.0.md` solo conserva referencias hacia la guía vigente y su revisión histórica. Las pruebas protegen el original y ambas versiones del splash.
+El README publicado de 1.0 se conserva byte por byte en `legacy/v1.20.36/README.md`, sin añadirle enlaces. La portada y descripción del paquete pasan a `README.md`, dedicadas a 2.7 con descarga del portable y PDF. `README-2.0.md` solo conserva referencias hacia la guía vigente y su revisión histórica. El árbol activo distribuye un único splash aprobado.
 
-Se elimina el BAT de compatibilidad redundante de la raíz; se mantienen VBS, herramientas de desarrollo y el respaldo histórico. El portable debe excluir entornos virtuales, pruebas, cachés y registros personales. No se borra `venv` antiguo ni la configuración del usuario durante esta limpieza.
+Se elimina el BAT de compatibilidad redundante de la raíz; se mantienen VBS y herramientas de desarrollo. El portable debe excluir entornos virtuales, pruebas, cachés y registros personales. La carpeta `legacy` conserva solo la versión 1.20.36 que se referencia explícitamente.
 
 Las capturas reales se registran en [capturas](captures/README.md). El capturador falló en este Windows; no hay imágenes nuevas que se puedan presentar como capturas válidas.

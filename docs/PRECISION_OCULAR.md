@@ -10,7 +10,7 @@ No modifica los gestos, roles ni acciones de las manos. Se prepara como portable
 3. Abre **Calibrar mirada…**. Sigue los 21 objetivos de aprendizaje y los 13 nuevos de comprobación; los dibujos de ojos no son objetivos. Los puntos adicionales comprueban también zonas cercanas a las esquinas.
 4. Si no aprueba, conserva el intento con **E**. **D** muestra el detalle y **P** permite ver la estimación sin controlar la PC. No hace falta repetir a ciegas: comparte el JSON y el mapa del error para investigar.
 
-El entorno `.venv` de esta carpeta y los cuatro archivos de modelo ya están preparados. **Personal · OpenVINO** conserva v1 (13 + 9), y **Anterior · comparación** el motor geométrico (9 + 5); cada motor requiere su propia calibración. La opción de cursor con índice sigue disponible y no carga OpenVINO ni seguimiento facial. El portable dev4 se usa extrayendo su ZIP completo y abriendo `BioGestureControlPro.exe`; debe conservarse `_internal` junto a él.
+El entorno `.venv` de esta carpeta y los cuatro archivos de modelo ya están preparados. El programa utiliza únicamente **Precisión v2 · OpenVINO** (21 objetivos de entrenamiento y 13 de comprobación). Los identificadores anteriores solo se conservan para reproducir diagnósticos históricos; no se ofrecen como opciones nuevas. La opción de cursor con índice sigue disponible y no carga OpenVINO ni seguimiento facial. El portable dev4 se usa extrayendo su ZIP completo y abriendo `BioGestureControlPro.exe`; debe conservarse `_internal` junto a él.
 
 ## Qué cambió
 

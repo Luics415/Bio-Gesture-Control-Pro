@@ -1,7 +1,6 @@
 """Replace only the centered version number in the approved author splash."""
 
 from pathlib import Path
-import shutil
 
 import cv2
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
@@ -10,12 +9,9 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 SPLASH = ROOT / "assets/brand/splash-author.png"
-ARCHIVE = ROOT / "assets/brand/splash-author-2.7.png"
 
 
 def main():
-    if not ARCHIVE.exists():
-        shutil.copy2(SPLASH, ARCHIVE)
     original = Image.open(SPLASH).convert("RGBA")
     rgb = np.asarray(original.convert("RGB"))
 

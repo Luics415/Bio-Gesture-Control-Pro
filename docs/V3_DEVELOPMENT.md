@@ -35,7 +35,7 @@ La revisión del constructor también bloquea `openvino.tools` y `openvino_telem
 
 ## Motor personal de precisión v1 · 8 de septiembre de 2026
 
-Revisión del motor dentro de `3.0.0.dev3`, identificada como `precision-openvino-v1`. La configuración permite elegirla o conservar `legacy-ridge-v1` para comparar; el índice sigue siendo la opción inicial. No se han cambiado las manos ni sus acciones en esta revisión.
+La revisión actual usa `precision-openvino-v2` como único motor ocular de nuevas sesiones. Los identificadores `precision-openvino-v1` y `legacy-ridge-v1` solo se conservan para reproducir informes históricos; ya no son opciones de configuración. No se han cambiado las manos ni sus acciones en esta revisión.
 
 - Dos modelos Open Model Zoo FP32 (postura y mirada), con licencia Apache-2.0, revisión y hashes fijos; carga de cuatro archivos mediante bytes. Runtime OpenVINO 2024.6.0 instalado en `.venv`, CPU de dos hilos y un stream. Sin descargas al iniciar.
 - Modelo personal de núcleo lineal/radial, selección por objetivo de entrenamiento y normalización independiente en cada partición. No utiliza los nueve objetivos finales para seleccionar ni corregir el ajuste.

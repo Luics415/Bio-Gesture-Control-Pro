@@ -14,7 +14,7 @@ import sys
 import threading
 
 
-ENGINE_ID = "precision-openvino-v1"
+ENGINE_ID = "precision-openvino-v2"
 OMZ_COMMIT = "6697dead54ed1cdd664b0313189c2cb52ee6335e"
 MODEL_BASE_URL = "https://storage.openvinotoolkit.org/repositories/open_model_zoo/2023.0/models_bin/1"
 MODEL_LICENSE_URL = f"https://raw.githubusercontent.com/openvinotoolkit/open_model_zoo/{OMZ_COMMIT}/LICENSE"

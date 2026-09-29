@@ -133,6 +133,11 @@ class Settings:
             # normalize them to the single full-quality runtime profile.
             if raw.get("performance_mode") == "saving":
                 raw["performance_mode"] = "optimal"
+            # The ocular runtime is now deliberately single-engine. Historical
+            # settings remain readable, but cannot silently select an obsolete
+            # estimator on the next launch.
+            if raw.get("gaze_engine") != "precision-openvino-v2":
+                raw["gaze_engine"] = "precision-openvino-v2"
             known = {f.name for f in fields(cls)}
             return cls(**{k: v for k, v in raw.items() if k in known}).validate()
         except (OSError, ValueError, TypeError):

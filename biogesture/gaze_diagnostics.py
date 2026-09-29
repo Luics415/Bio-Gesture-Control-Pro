@@ -23,7 +23,8 @@ FEATURE_NAMES = (
 )
 LEGACY_ENGINE_ID = "legacy-ridge-v1"
 PRECISION_ENGINE_ID = "precision-openvino-v1"
-PRECISION_ENGINE_IDS = frozenset((PRECISION_ENGINE_ID, "precision-openvino-v2"))
+PERIPHERAL_ENGINE_ID = "precision-openvino-v2"
+PRECISION_ENGINE_IDS = frozenset((PRECISION_ENGINE_ID, PERIPHERAL_ENGINE_ID))
 PRECISION_OBSERVATION_SCHEMA = "openvino-gaze6-v1"
 AUXILIARY_FEATURE_NAMES = (
     "gaze_unit_x", "gaze_unit_y", "gaze_unit_z", "head_yaw_radians", "head_pitch_radians", "head_roll_radians",

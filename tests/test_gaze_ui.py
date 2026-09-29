@@ -9,8 +9,9 @@ import pytest
 
 from biogesture.coordinates import RectMonitor
 from biogesture.gaze import CALIBRATION_TARGETS, CalibrationReport, GazeObservation
-from biogesture.gaze_ui import (CalibrationCollector, GazeCalibrationDialog,
-                                WIZARD_VALIDATION_TARGETS, position_calibration_window)
+from biogesture.gaze_ui import (CALIBRATION_TARGET_COLORS, CalibrationCollector,
+                                GazeCalibrationDialog, WIZARD_VALIDATION_TARGETS,
+                                position_calibration_window)
 
 
 def observation(timestamp, target=(.5, .5)):
@@ -502,8 +503,8 @@ def test_target_draw_uses_monitor_local_coordinates_with_no_camera_overlay():
     x, y = CALIBRATION_TARGETS[0]
     x, y = x * 1919, y * 1079
     assert dialog.canvas.create_oval.call_args_list == [
-        call(x - 17, y - 17, x + 17, y + 17, outline="#075663", width=2),
-        call(x - 4, y - 4, x + 4, y + 4, fill="#17242d", outline=""),
+        call(x - 17, y - 17, x + 17, y + 17, outline=CALIBRATION_TARGET_COLORS[0], width=2),
+        call(x - 4, y - 4, x + 4, y + 4, fill=CALIBRATION_TARGET_COLORS[0], outline=""),
     ]
 
 

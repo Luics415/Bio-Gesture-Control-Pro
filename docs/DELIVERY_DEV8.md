@@ -8,7 +8,7 @@ El puntero ocular mantiene el filtro One Euro independiente del índice y baja s
 
 ## Identidad visual
 
-El splash conserva exactamente el ancla, el nombre, ADMIN, INVITADO, la barra y la firma **Desarrollado por Luics415**. Solo se actualiza el número visible de **2.7** a **3.5**. La edición anterior se conserva en `assets/brand/splash-author-2.7.png`; la edición 2.0 histórica permanece intacta.
+El splash conserva exactamente el ancla, el nombre, ADMIN, INVITADO, la barra y la firma **Desarrollado por Luics415**. Solo se actualiza el número visible de **2.7** a **3.5**. El árbol activo distribuye únicamente `assets/brand/splash-author.png`.
 
 La suma SHA-256 del splash 3.5 es `cc4b90b98228a07cb54fb95231bd7de65e0ad40c8817d7c5ab216049bfd996d9`.
 

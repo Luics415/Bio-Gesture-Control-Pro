@@ -91,7 +91,9 @@ def test_defaults_and_persisted_comparison_choice_preserve_hand_settings(tmp_pat
                      auxiliary_scroll_sensitivity=1.2)
     path = tmp_path / "settings.json"
     prior.save(path)
-    assert asdict(Settings.load(path)) == asdict(prior)
+    loaded = Settings.load(path)
+    assert loaded.gaze_engine == PERIPHERAL_ENGINE
+    assert asdict(loaded) == asdict(replace(prior, gaze_engine=PERIPHERAL_ENGINE))
     assert type(create_gaze_calibration("precision-openvino-v1")) is PrecisionGazeCalibration
     assert type(create_gaze_calibration(PERIPHERAL_ENGINE)) is PeripheralGazeCalibration
 

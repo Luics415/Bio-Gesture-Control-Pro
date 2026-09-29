@@ -29,7 +29,7 @@ addopts = "-ra"
 [tool.ruff]
 target-version = "py312"
 line-length = 120
-extend-exclude = ["venv", ".venv", "legacy", "import sys.py"]
+extend-exclude = ["venv", ".venv", "legacy"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F"]

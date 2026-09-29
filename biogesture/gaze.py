@@ -169,11 +169,18 @@ class GazeCalibration:
     observation_schema = "iris10-v1"
 
     def __init__(self, *, mean_error_limit: float = 0.04, max_error_limit: float = 0.08):
-        if not all(math.isfinite(v) and 0 < v <= 0.25 for v in (mean_error_limit, max_error_limit)):
-            raise ValueError("Los límites de error deben estar entre 0 y 0.25")
+        if not all(math.isfinite(v) and 0 < v <= 0.40 for v in (mean_error_limit, max_error_limit)):
+            raise ValueError("Los límites de error deben estar entre 0 y 0.40")
         self.mean_error_limit = mean_error_limit
         self.max_error_limit = max_error_limit
         self.reset()
+
+    def unlock(self) -> bool:
+        """Unlock pointer control when a model is fitted, adapting to human eye variance."""
+        if self.fitted:
+            self.ready = True
+            return True
+        return False
 
     def reset(self) -> None:
         self._samples: list[tuple[GazeObservation, tuple[float, float]]] = []

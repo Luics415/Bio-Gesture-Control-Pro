@@ -133,8 +133,9 @@ class DesktopApp:
         if self.eyes_mode:
             from .gaze import GazeSession
             from .gaze_pointer import GazePointerMapper
-            from .gaze_precision import create_gaze_calibration
-            self._gaze_session = GazeSession(create_gaze_calibration(self.settings.gaze_engine))
+            from .gaze_precision import PERIPHERAL_ENGINE, create_gaze_calibration
+            self._gaze_session = GazeSession(create_gaze_calibration(
+                PERIPHERAL_ENGINE, mean_error_limit=0.18, max_error_limit=0.30))
             # Eye calibration already returns monitor-normalized coordinates;
             # it must never pass through the index's camera active rectangle.
             self._gaze_mapper = GazePointerMapper(choose_monitor(self.monitors, self.settings.monitor_id))
@@ -741,10 +742,7 @@ class DesktopApp:
         viewport.bind("<Configure>", fit_notebook)
         variables = {}
         tabs = {}
-        choice_maps = {"cursor_mode": {"Dedo índice": "index", "Ojos (experimental)": "eyes"},
-                       "gaze_engine": {"Precisión v2 · OpenVINO": "precision-openvino-v2",
-                                       "Personal · OpenVINO": "precision-openvino-v1",
-                                       "Anterior · comparación": "legacy-ridge-v1"}}
+        choice_maps = {"cursor_mode": {"Dedo índice": "index", "Ojos (experimental)": "eyes"}}
         for name in ("Control", "Cámara", "Precisión", "Escritorio", "Diagnóstico"):
             tabs[name] = ttk.Frame(notebook, padding=12)
             notebook.add(tabs[name], text=name)
@@ -772,7 +770,9 @@ class DesktopApp:
         ttk.Label(tabs["Control"], text="Rendimiento").grid(row=1, column=0, sticky="w", pady=5)
         ttk.Label(tabs["Control"], text="Óptimo (calidad máxima; fijo)").grid(
             row=1, column=1, sticky="w", padx=(18, 0), pady=5)
-        field("Control", "Motor ocular", "gaze_engine", tuple(choice_maps["gaze_engine"]))
+        ttk.Label(tabs["Control"], text="Motor ocular").grid(row=2, column=0, sticky="w", pady=5)
+        ttk.Label(tabs["Control"], text="Precisión v2 · OpenVINO (fijo)").grid(
+            row=2, column=1, sticky="w", padx=(18, 0), pady=5)
 
         def release_variables():
                 variables.clear()
@@ -873,7 +873,8 @@ class DesktopApp:
                     previous = getattr(self.settings, key)
                     changes[key] = (choice_maps[key][variable.get()] if key in choice_maps
                                     else type(previous)(variable.get()))
-                candidate = replace(self.settings, performance_mode="optimal", **changes).validate()
+                candidate = replace(self.settings, performance_mode="optimal",
+                                    gaze_engine="precision-openvino-v2", **changes).validate()
                 restart_keys = ("camera_index", "capture_width", "capture_height", "capture_fps", "detection_fps",
                                 "mirror", "detection_confidence", "tracking_confidence", "cursor_mode",
                                 "gaze_engine")
@@ -943,7 +944,7 @@ class DesktopApp:
             self._calibration_dialog.lift()
             return
         from .gaze_ui import GazeCalibrationDialog
-        from .gaze_precision import gaze_calibration_type
+        from .gaze_precision import PERIPHERAL_ENGINE, create_gaze_calibration
         self._reset_gaze_session()
         if self.pipeline:
             self.pipeline.set_resting(False)
@@ -983,7 +984,8 @@ class DesktopApp:
         owner = GazeCalibrationDialog(self.root, monitor,
                                       lambda: self.pipeline.latest_gaze() if self.pipeline else None,
                                       complete, close,
-                                      calibration_factory=gaze_calibration_type(self.settings.gaze_engine),
+                                      calibration_factory=lambda: create_gaze_calibration(
+                                          PERIPHERAL_ENGINE, mean_error_limit=0.18, max_error_limit=0.30),
                                       latest_preview=lambda: self.pipeline.latest_eye_preview() if self.pipeline else None,
                                       set_preview_enabled=lambda enabled: self.pipeline.set_eye_preview_enabled(enabled)
                                       if self.pipeline else None,
