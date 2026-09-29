@@ -18,6 +18,11 @@ from biogesture.settings import Settings
 from tests.test_gaze_ui import bare_dialog, failed_accuracy_collector, observation
 
 
+def test_stabilizer_uses_the_reduced_tremor_profile():
+    assert GazePointerFilter.MIN_CUTOFF == pytest.approx(.22)
+    assert GazePointerFilter.BETA == pytest.approx(4.)
+
+
 @pytest.mark.parametrize("fps", [15, 24, 30, 60])
 def test_fixation_reduces_synthetic_jitter_without_changing_mean(fps):
     rng = random.Random(415)

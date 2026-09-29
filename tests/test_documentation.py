@@ -28,6 +28,9 @@ def test_splash_original_is_archived_and_current_has_requested_version_edit():
         "8a499e2225eadfd0cbc7df5be9a706878c7f3af882935bd00e20ecf06be02020"
     )
     assert hashlib.sha256((ROOT / "assets/brand/splash-author.png").read_bytes()).hexdigest() == (
+        "cc4b90b98228a07cb54fb95231bd7de65e0ad40c8817d7c5ab216049bfd996d9"
+    )
+    assert hashlib.sha256((ROOT / "assets/brand/splash-author-2.7.png").read_bytes()).hexdigest() == (
         "6f6d427ad02b1cb11f0c09195c92a0a38c095b78427b87e4fead4e2adcc45924"
     )
 

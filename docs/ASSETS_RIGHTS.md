@@ -5,7 +5,7 @@ Revisión: 28 de septiembre de 2026.
 ## Identidad del proyecto
 
 - `assets/brand/anchor-approved.png` es el ancla aprobada por Luics415.
-- `assets/brand/splash-author.png` es la composición aprobada con “2.7” y “Desarrollado por Luics415”. `splash-author-2.0.png` se conserva como histórico y no se usa como splash del portable.
+- `assets/brand/splash-author.png` es la composición aprobada con “3.5” y “Desarrollado por Luics415”. `splash-author-2.7.png` y `splash-author-2.0.png` se conservan como históricos y no se usan como splash del portable.
 - `assets/brand/tray.png` y `app.ico` son conversiones del ancla para la bandeja y Windows. No se descargan imágenes de terceros al ejecutar.
 
 ## Manual y capturas

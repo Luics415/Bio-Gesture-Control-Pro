@@ -20,12 +20,12 @@ class GazePointerFilter:
     This is smoothing, not a correction to calibration accuracy.
     """
 
-    # A lower base cutoff gives a calmer fixation.  A moderate beta keeps
-    # deliberate saccades responsive without reintroducing camera noise.
+    # A lower base cutoff gives a calmer fixation. A restrained beta keeps
+    # deliberate saccades responsive while suppressing residual eye tremor.
     # Values are tuned in normalized monitor coordinates and are shared by
     # the desktop cursor and the diagnostic P viewer.
-    MIN_CUTOFF = 0.3
-    BETA = 5.0
+    MIN_CUTOFF = 0.22
+    BETA = 4.0
     DERIVATIVE_CUTOFF = 1.0
     RESET_GAP_SECONDS = .25
     JUMP_DISTANCE = .16

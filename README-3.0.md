@@ -4,7 +4,7 @@
 
 Desarrollado por Luics415 · ⚓
 
-[Guía de pruebas en PDF](docs/manual/Guia-de-pruebas-3.0.pdf) · [Manual 3.0 en texto](docs/manual/Guia-3.0.md) · [Estado de fases y validación](docs/V3_DEVELOPMENT.md) · [Entrega dev.7](docs/DELIVERY_DEV7.md) · [Privacidad, términos y cookies](docs/legal/README.md)
+[Guía de pruebas en PDF](docs/manual/Guia-de-pruebas-3.0.pdf) · [Manual 3.0 en texto](docs/manual/Guia-3.0.md) · [Estado de fases y validación](docs/V3_DEVELOPMENT.md) · [Entrega dev.7](docs/DELIVERY_DEV7.md) · [Corrección ocular y splash 3.5](docs/DELIVERY_DEV8.md) · [Privacidad, términos y cookies](docs/legal/README.md)
 
 ## Lo que cambia
 

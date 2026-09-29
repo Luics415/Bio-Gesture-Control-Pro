@@ -31,7 +31,7 @@ OPENVINO_DLLS = ("openvino.dll", "openvino_intel_cpu_plugin.dll", "openvino_ir_f
                 "tbb12.dll", "tbbbind_2_5.dll", "tbbmalloc.dll", "tbbmalloc_proxy.dll")
 PUBLIC_FILES = ("README.md", "README-2.0.md", "README-3.0.md", "legacy/v1.20.36/README.md", "LICENSE", "SECURITY.md", "THIRD_PARTY_NOTICES.md",
                 "docs/GESTURES.md", "docs/ARCHITECTURE.md", "docs/PHASES_1_4.md", "docs/DEVELOPMENT.md",
-                "docs/DISTRIBUTION.md", "docs/VALIDATION.md", "docs/DELIVERY_DEV7.md", "docs/captures/README.md",
+                "docs/DISTRIBUTION.md", "docs/VALIDATION.md", "docs/DELIVERY_DEV7.md", "docs/DELIVERY_DEV8.md", "docs/captures/README.md",
                 "docs/PRECISION_OCULAR.md", "docs/DIAGNOSTICO_OCULAR.md", "docs/manual/Guia-3.0.md",
                 "docs/ASSETS_RIGHTS.md",
                 "docs/legal/README.md", "docs/legal/PRIVACIDAD.md", "docs/legal/TERMINOS.md",
