@@ -29,6 +29,14 @@ class GazePointerFilter:
     DERIVATIVE_CUTOFF = 1.0
     RESET_GAP_SECONDS = .25
     JUMP_DISTANCE = .16
+    # Normalized deadband used only after the temporal filter.  Small residual
+    # eye tremor inside this radius is treated as the same fixation, so the
+    # desktop pointer does not wander while the user is looking at one place.
+    # The release radius gives a little hysteresis and avoids rapid re-entry at
+    # the edge of the deadband.  These values are deliberately much smaller
+    # than a normal intended gaze shift.
+    FIXATION_RADIUS = .0055
+    FIXATION_RELEASE_RADIUS = .010
 
     def __init__(self):
         self._x = OneEuroFilter(self.MIN_CUTOFF, self.BETA, self.DERIVATIVE_CUTOFF)
@@ -39,6 +47,8 @@ class GazePointerFilter:
         self._x.reset()
         self._y.reset()
         self._timestamp = self._accepted = self._value = self._pending_origin = None
+        self._fixation = None
+        self._fixation_active = False
 
     @property
     def timestamp(self):
@@ -64,7 +74,25 @@ class GazePointerFilter:
                 self._pending_origin = self._accepted
                 return self._value
         self._accepted = point
-        self._value = self._x(x, timestamp), self._y(y, timestamp)
+        filtered = self._x(x, timestamp), self._y(y, timestamp)
+        if self._fixation is None:
+            self._fixation = filtered
+            self._fixation_active = True
+        elif self._fixation_active:
+            # Keep the pointer at the concentration point until the filtered
+            # gaze leaves the larger release radius.  Raw observations and
+            # calibration diagnostics remain untouched by this output hold.
+            if math.dist(filtered, self._fixation) < self.FIXATION_RELEASE_RADIUS:
+                filtered = self._fixation
+            else:
+                self._fixation = filtered
+                self._fixation_active = False
+        elif math.dist(filtered, self._fixation) <= self.FIXATION_RADIUS:
+            # Re-entering the small radius after a release establishes a new
+            # fixation; this avoids chatter at the edge of the deadband.
+            self._fixation = filtered
+            self._fixation_active = True
+        self._value = filtered
         return self._value
 
     __call__ = filter

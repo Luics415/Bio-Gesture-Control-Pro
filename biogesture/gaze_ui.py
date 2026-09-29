@@ -546,6 +546,8 @@ class GazeCalibrationDialog:
                          "derivative_cutoff": GazePointerFilter.DERIVATIVE_CUTOFF,
                          "reset_gap_seconds": GazePointerFilter.RESET_GAP_SECONDS,
                          "jump_distance": GazePointerFilter.JUMP_DISTANCE,
+                         "fixation_radius": GazePointerFilter.FIXATION_RADIUS,
+                         "fixation_release_radius": GazePointerFilter.FIXATION_RELEASE_RADIUS,
                      }},
             include_samples=include_samples)
         if not include_samples:
@@ -719,21 +721,19 @@ class GazeCalibrationDialog:
         if probe:
             self._paint_probe()
         elif collector.running:
-            label = "Calibración" if collector.phase == "calibration" else "Comprobación"
-            # Peripheral targets may sit at 5% of the screen. Instructions and
-            # controls must not cover them, including on compact monitors.
-            # Keep a single status line on the opposite vertical edge.
-            status_y = height - 18 if collector.target[1] <= .5 else 18
-            canvas.create_text(width / 2, status_y,
-                               text=f"⚓  {label} · {collector.point_index + 1} de {len(collector.targets)} · Esc: cancelar",
-                               fill=palette["text"], font=("Segoe UI", -13), width=width - 36)
+            # During acquisition the target is deliberately the only drawing
+            # on the canvas.  Text near the edges competed with peripheral
+            # points and made the wizard feel like a diagnostic console.  The
+            # short instructions remain on the idle/result screens, while
+            # Escape is still bound globally for cancellation.
             x, y = collector.target
             x, y = x * (width - 1), y * (height - 1)
             canvas.create_oval(x - 17, y - 17, x + 17, y + 17, outline=palette["accent"], width=2)
-            canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill=palette["text"], outline="")
-            message_y = height - 43 if collector.target[1] <= .5 else 43
-            canvas.create_text(width / 2, message_y, text=collector.message,
-                               fill=palette["muted"], font=("Segoe UI", -12), width=width - 36)
+            # Alternate the centre between two high-contrast static colours.
+            # It changes only when the target changes, never on a timer, so it
+            # attracts attention without adding animation or CPU work.
+            center_color = palette["text"] if collector.point_index % 2 == 0 else palette["accent"]
+            canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill=center_color, outline="")
             if detail:
                 self._paint_live_details()
         elif detail:

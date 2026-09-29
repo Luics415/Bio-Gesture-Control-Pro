@@ -36,6 +36,19 @@ def test_fixation_reduces_synthetic_jitter_without_changing_mean(fps):
         assert abs(statistics.mean(actual) - statistics.mean(source)) < .002
 
 
+def test_micro_movement_holds_the_established_fixation_point():
+    smoother = GazePointerFilter()
+    centre = smoother(.5, .5, 1.0)
+    held = [smoother(.502, .498, 1.0 + index * .04)
+            for index in range(1, 8)]
+    assert all(point == centre for point in held)
+    # A clear intentional gaze shift still leaves the one-frame jump guard,
+    # then exits the deadband instead of being held forever.
+    assert smoother(.8, .8, 1.32) == centre
+    moved = smoother(.8, .8, 1.36)
+    assert moved[0] > .7 and moved[1] > .7
+
+
 @pytest.mark.parametrize("fps", [15, 24, 30, 60])
 def test_confirmed_step_reaches_ninety_percent_within_150_ms(fps):
     smoother = GazePointerFilter()
