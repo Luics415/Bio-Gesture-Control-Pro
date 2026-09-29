@@ -82,7 +82,7 @@ def make_eye_preview(rgb, landmarks, timestamp):
         return None
 
 
-def eye_focus_ok(rgb, landmarks, minimum_variance=12.0):
+def eye_focus_ok(rgb, landmarks, minimum_variance=8.0):
     """Conservative blur gate on eye crops, not a glasses/reflection classifier.
 
     The initial threshold is experimental and must be measured on real cameras.

@@ -601,6 +601,14 @@ class DesktopApp:
         self.mapper.reset()
         if self.eyes_mode and hasattr(self, "_gaze_mapper"):
             self._gaze_mapper.reset()
+        if not paused and self.eyes_mode:
+            if hasattr(self, "_gaze_session") and self._gaze_session is not None:
+                self._gaze_session.paused = False
+                now = time.monotonic()
+                self._gaze_session._start = now
+                self._gaze_session._last_valid = now
+            if getattr(self, "pipeline", None):
+                self.pipeline.set_resting(False)
         self._update_tray_state()
 
     def _update_tray_state(self):
@@ -618,9 +626,13 @@ class DesktopApp:
             if not self._gaze_session.calibration.ready:
                 self.open_gaze_calibration()
                 return
-            if not self._gaze_state or not self._gaze_state.can_act:
-                self.notify("Necesitas mirada estable; después del reposo, reanuda con victoria.")
-                return
+            if hasattr(self, "_gaze_session") and self._gaze_session is not None:
+                self._gaze_session.paused = False
+                now = time.monotonic()
+                self._gaze_session._start = now
+                self._gaze_session._last_valid = now
+            if getattr(self, "pipeline", None):
+                self.pipeline.set_resting(False)
         self.pause(not self.engine.paused)
 
     def _apply_window_mode(self):

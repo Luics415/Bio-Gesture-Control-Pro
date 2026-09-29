@@ -49,6 +49,7 @@ class GazePointerFilter:
         self._timestamp = self._accepted = self._value = self._pending_origin = None
         self._fixation = None
         self._fixation_active = False
+        self._candidate_fixation = None
 
     @property
     def timestamp(self):
@@ -78,20 +79,22 @@ class GazePointerFilter:
         if self._fixation is None:
             self._fixation = filtered
             self._fixation_active = True
+            self._candidate_fixation = None
         elif self._fixation_active:
             # Keep the pointer at the concentration point until the filtered
-            # gaze leaves the larger release radius.  Raw observations and
-            # calibration diagnostics remain untouched by this output hold.
+            # gaze leaves the larger release radius.
             if math.dist(filtered, self._fixation) < self.FIXATION_RELEASE_RADIUS:
                 filtered = self._fixation
             else:
-                self._fixation = filtered
                 self._fixation_active = False
-        elif math.dist(filtered, self._fixation) <= self.FIXATION_RADIUS:
-            # Re-entering the small radius after a release establishes a new
-            # fixation; this avoids chatter at the edge of the deadband.
-            self._fixation = filtered
-            self._fixation_active = True
+                self._candidate_fixation = filtered
+        else:
+            # In deliberate saccade/motion: establish fixation only when motion settles
+            if self._candidate_fixation is not None and math.dist(filtered, self._candidate_fixation) <= self.FIXATION_RADIUS:
+                self._fixation = filtered
+                self._fixation_active = True
+            else:
+                self._candidate_fixation = filtered
         self._value = filtered
         return self._value
 

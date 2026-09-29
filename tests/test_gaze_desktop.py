@@ -249,7 +249,6 @@ def test_seventy_second_rest_requires_victory_even_after_stable_eyes_return():
     gaze(app, 170.3)
     gaze(app, 170.5)
     assert not app._gaze_state.can_act
-    app.toggle_pause()
     assert app.engine.paused
     for index in range(70):
         now = 170.6 + index / 30
@@ -259,6 +258,16 @@ def test_seventy_second_rest_requires_victory_even_after_stable_eyes_return():
     assert app._gaze_state.can_act
     app.pipeline.set_resting.assert_called_with(False)
     native.button.assert_not_called()
+
+
+def test_activation_button_unpauses_immediately_on_first_click():
+    app, native = ocular_app()
+    app.pause(True)
+    assert app.engine.paused
+    app.toggle_pause()
+    assert not app.engine.paused
+    assert not app._gaze_session.paused
+
 
 
 def test_victory_cannot_unlock_rest_without_valid_eyes():
