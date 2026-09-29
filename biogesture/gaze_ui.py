@@ -35,7 +35,7 @@ CALIBRATION_TARGET_COLORS = (
     "#facc15",  # amarillo
     "#22c55e",  # verde
     "#3b82f6",  # azul
-    "#94a3b8",  # gris
+    "#ffffff",  # blanco (en lugar de gris para contraste sobre el fondo mate)
     "#a855f7",  # morado
     "#ec4899",  # rosa
 )
@@ -769,7 +769,7 @@ class GazeCalibrationDialog:
             x, y = collector.target
             x, y = x * (width - 1), y * (height - 1)
             target_color = CALIBRATION_TARGET_COLORS[collector.point_index % len(CALIBRATION_TARGET_COLORS)]
-            canvas.create_oval(x - 17, y - 17, x + 17, y + 17, outline=target_color, width=2)
+            canvas.create_oval(x - 17, y - 17, x + 17, y + 17, outline="#000000", width=2)
             canvas.create_oval(x - 4, y - 4, x + 4, y + 4, fill=target_color, outline="")
             if detail:
                 self._paint_live_details()

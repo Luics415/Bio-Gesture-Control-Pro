@@ -503,9 +503,28 @@ def test_target_draw_uses_monitor_local_coordinates_with_no_camera_overlay():
     x, y = CALIBRATION_TARGETS[0]
     x, y = x * 1919, y * 1079
     assert dialog.canvas.create_oval.call_args_list == [
-        call(x - 17, y - 17, x + 17, y + 17, outline=CALIBRATION_TARGET_COLORS[0], width=2),
+        call(x - 17, y - 17, x + 17, y + 17, outline="#000000", width=2),
         call(x - 4, y - 4, x + 4, y + 4, fill=CALIBRATION_TARGET_COLORS[0], outline=""),
     ]
+
+
+def test_target_colors_and_black_ring():
+    assert len(CALIBRATION_TARGET_COLORS) == 7
+    # 5th color (index 4) is white for high contrast over neutral gray background
+    assert CALIBRATION_TARGET_COLORS[4] == "#ffffff"
+    dialog = bare_dialog()
+    dialog._paint = GazeCalibrationDialog._paint.__get__(dialog)
+    dialog._painted = None
+    dialog.canvas = Mock()
+    dialog.start_button = Mock()
+    dialog.monitor = RectMonitor("main", "Principal", 0, 0, 1920, 1080)
+    dialog.collector.start(10)
+    dialog.collector.point_index = 4
+    dialog._paint()
+    calls = dialog.canvas.create_oval.call_args_list
+    assert calls[0][1]["outline"] == "#000000"
+    assert calls[1][1]["fill"] == "#ffffff"
+
 
 
 def test_background_cannot_change_while_target_is_running_and_invalidates_point_only_retry():
