@@ -36,7 +36,7 @@ class GazePointerFilter:
     # the edge of the deadband.  These values are deliberately much smaller
     # than a normal intended gaze shift.
     FIXATION_RADIUS = .0055
-    FIXATION_RELEASE_RADIUS = .010
+    FIXATION_RELEASE_RADIUS = .012
 
     def __init__(self):
         self._x = OneEuroFilter(self.MIN_CUTOFF, self.BETA, self.DERIVATIVE_CUTOFF)

@@ -814,8 +814,8 @@ class DesktopApp:
 
         for label, key, options in (
             ("Índice de cámara (0–16)", "camera_index", None),
-            ("Ancho solicitado", "capture_width", (320, 640, 960, 1280, 1920)),
-            ("Alto solicitado", "capture_height", (240, 360, 480, 540, 720, 1080)),
+            ("Ancho solicitado", "capture_width", (320, 640, 800, 960, 1280, 1920)),
+            ("Alto solicitado", "capture_height", (240, 360, 450, 480, 540, 720, 1080)),
             ("FPS de cámara", "capture_fps", (15, 24, 30, 60)),
             ("FPS de detección", "detection_fps", (5, 10, 15, 24, 30, 60)),
             ("Vista espejo", "mirror", None),

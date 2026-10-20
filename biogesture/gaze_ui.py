@@ -507,6 +507,8 @@ class GazeCalibrationDialog:
             return
         calibration = self.collector.calibration
         if calibration is not None and getattr(calibration, "fitted", False):
+            if hasattr(calibration, "refine_for_session"):
+                calibration.refine_for_session(self.collector.validation_samples)
             if hasattr(calibration, "unlock"):
                 calibration.unlock()
             else:
@@ -693,8 +695,11 @@ class GazeCalibrationDialog:
             self._paint_preview()
         if self.collector.phase == "complete" and not self._delivered:
             self._delivered = True
+            calibration = self.collector.calibration
+            if hasattr(calibration, "refine_for_session"):
+                calibration.refine_for_session(self.collector.validation_samples)
             try:
-                self._on_success(self.collector.calibration)
+                self._on_success(calibration)
             finally:
                 self.destroy()
             return

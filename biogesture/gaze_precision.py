@@ -90,7 +90,7 @@ def _fit_model(x, y, width, ridge):
     mean = x.mean(axis=0)
     scale = np.maximum(x.std(axis=0), .025)
     # Prevent tiny posture variation dominating the actual ocular signal.
-    scale[-3:] /= .35
+    scale[-3:] /= .05
     centers = (x - mean) / scale
     intercept = y.mean(axis=0)
     weights = np.linalg.solve(_kernel(centers, centers, width) + ridge * np.eye(len(x)), y - intercept)
@@ -200,6 +200,56 @@ class PrecisionGazeCalibration(GazeCalibration):
                 reason=f"Se necesitan {len(self.validation_targets)} objetivos nuevos con observaciones del motor ocular")
             return self.report
         return super().validate(pairs)
+
+    def refine_for_session(self, validation_samples):
+        """Incorporate consistent held-out validation points into the live session model."""
+        if not self.fitted or not self._selected or not validation_samples:
+            return False
+        extra_by_target = {}
+        for observation, target_xy in validation_samples:
+            try:
+                target = self._target(target_xy)
+            except (TypeError, ValueError):
+                continue
+            if target is not None and precision_observation_usable(observation):
+                extra_by_target.setdefault(target, []).append(observation)
+        if not extra_by_target:
+            return False
+        try:
+            family, width, ridge = (self._selected[k] for k in ("family", "width", "ridge"))
+            accepted_extra = []
+            accepted_targets = 0
+            for target, group in extra_by_target.items():
+                vectors = np.asarray([_vector(o, family) for o in group])
+                predicted = np.median(_predict_model(self._personal_model, vectors, width), axis=0)
+                if float(np.linalg.norm(predicted - np.asarray(target))) <= .18:
+                    accepted_targets += 1
+                    accepted_extra.extend((o, target) for o in group)
+            if accepted_targets < max(3, (len(extra_by_target) + 1) // 2):
+                return False
+            combined = list(self._samples) + accepted_extra
+            unique = sorted(set(target for _, target in combined))
+            if len(unique) <= len(set(target for _, target in self._samples)):
+                return False
+            targets = np.asarray(unique)
+            x = np.asarray([np.median([_vector(o, family) for o, t in combined if t == target], axis=0)
+                            for target in unique])
+            model = _fit_model(x, targets, width, ridge)
+            if not all(np.isfinite(v).all() for v in model):
+                return False
+            self._personal_model = model
+            raw_features = np.asarray([o.features for o, _ in combined])
+            self._low = np.quantile(raw_features, 0.05, axis=0)
+            self._high = np.quantile(raw_features, 0.95, axis=0)
+            binocular = raw_features[:, :2] - raw_features[:, 2:4]
+            self._binocular_low = np.quantile(binocular, 0.05, axis=0)
+            self._binocular_high = np.quantile(binocular, 0.95, axis=0)
+            neural = np.asarray([o.auxiliary_features for o, _ in combined])
+            self._neural_low = neural.min(axis=0)
+            self._neural_high = neural.max(axis=0)
+            return True
+        except (ValueError, np.linalg.LinAlgError, FloatingPointError):
+            return False
 
     def diagnostic_model(self):
         return {

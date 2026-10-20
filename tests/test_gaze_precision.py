@@ -190,3 +190,36 @@ def test_neural_resources_close_after_inference_failure(monkeypatch):
     assert not eye.latest().valid
     neural.close.assert_called_once_with()
     assert eye._neural is None
+
+
+def test_small_chair_posture_shift_does_not_drift_calibrated_gaze():
+    calibration = PrecisionGazeCalibration()
+    for stamp, target in enumerate(TRAINING_TARGETS, 1):
+        base = neural_observed(stamp, target)
+        # Tiny incidental head angle variation during still-head calibration.
+        yaw = (target[0] - .5) * .01
+        pitch = (target[1] - .5) * .01
+        sample = replace(base, auxiliary_features=base.auxiliary_features[:3] + (yaw, pitch, 0.))
+        assert calibration.add_sample(sample, target)
+    assert calibration.fit()
+    assert calibration.validate(validation()).passed
+    shifted = neural_observed(120, (.5, .5))
+    shifted = replace(shifted, auxiliary_features=shifted.auxiliary_features[:3] + (.08, -.06, .02))
+    predicted = calibration.predict(shifted)
+    assert predicted is not None
+    assert math.dist(predicted, (.5, .5)) < .015
+
+
+def test_refine_for_session_incorporates_consistent_validation_points_and_ignores_outliers():
+    calibration = fitted()
+    valid_pairs = validation()
+    assert calibration.validate(valid_pairs).passed
+    assert calibration.refine_for_session(valid_pairs)
+    assert len(calibration._personal_model[2]) == len(TRAINING_TARGETS) + len(VALIDATION_TARGETS)
+    assert calibration.predict(neural_observed(200, (.07, .93))) == pytest.approx((.07, .93), abs=.02)
+
+    calibration2 = fitted()
+    corrupted = [(neural_observed(stamp, (.5, .5)), target) for stamp, target in enumerate(VALIDATION_TARGETS, 30)]
+    calibration2.unlock()
+    assert not calibration2.refine_for_session(corrupted)
+
