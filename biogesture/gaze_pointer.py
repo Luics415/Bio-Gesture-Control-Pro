@@ -32,11 +32,10 @@ class GazePointerFilter:
     # Normalized deadband used only after the temporal filter.  Small residual
     # eye tremor inside this radius is treated as the same fixation, so the
     # desktop pointer does not wander while the user is looking at one place.
-    # The release radius gives a little hysteresis and avoids rapid re-entry at
-    # the edge of the deadband.  These values are deliberately much smaller
-    # than a normal intended gaze shift.
-    FIXATION_RADIUS = .0055
-    FIXATION_RELEASE_RADIUS = .012
+    # The release radius gives hysteresis and a soft transition to avoid rapid
+    # re-entry or sudden steps at the edge of the deadband.
+    FIXATION_RADIUS = .0085
+    FIXATION_RELEASE_RADIUS = .0175
 
     def __init__(self):
         self._x = OneEuroFilter(self.MIN_CUTOFF, self.BETA, self.DERIVATIVE_CUTOFF)
@@ -75,7 +74,11 @@ class GazePointerFilter:
                 self._pending_origin = self._accepted
                 return self._value
         self._accepted = point
-        filtered = self._x(x, timestamp), self._y(y, timestamp)
+        fx_in, fy_in = x, y
+        if self._fixation_active and self._fixation is not None and math.dist(point, self._fixation) < 0.036:
+            fx_in = 0.65 * x + 0.35 * self._fixation[0]
+            fy_in = 0.65 * y + 0.35 * self._fixation[1]
+        filtered = self._x(fx_in, timestamp), self._y(fy_in, timestamp)
         if self._fixation is None:
             self._fixation = filtered
             self._fixation_active = True
@@ -83,10 +86,18 @@ class GazePointerFilter:
         elif self._fixation_active:
             # Keep the pointer at the concentration point until the filtered
             # gaze leaves the larger release radius.
-            if math.dist(filtered, self._fixation) < self.FIXATION_RELEASE_RADIUS:
+            dist = math.dist(filtered, self._fixation)
+            if dist < self.FIXATION_RELEASE_RADIUS:
+                if dist > 0.0045:
+                    fx, fy = self._fixation
+                    self._fixation = (fx + 0.08 * (filtered[0] - fx), fy + 0.08 * (filtered[1] - fy))
                 filtered = self._fixation
             else:
                 self._fixation_active = False
+                if dist < 0.045:
+                    t = (dist - self.FIXATION_RELEASE_RADIUS) / (0.045 - self.FIXATION_RELEASE_RADIUS)
+                    fx, fy = self._fixation
+                    filtered = (fx + t * (filtered[0] - fx), fy + t * (filtered[1] - fy))
                 self._candidate_fixation = filtered
         else:
             # In deliberate saccade/motion: establish fixation only when motion settles

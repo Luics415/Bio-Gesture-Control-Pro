@@ -247,13 +247,13 @@ def test_initial_center_stare_and_relaxed_desktop_eyelids_stay_centered():
     assert calibration.validate(valid_pairs).passed
     assert calibration.refine_for_session(valid_pairs)
     assert calibration._session_y_offset < -0.015
-    # Simulate slightly relaxed upper eyelids on the live desktop at screen center
+    # Simulate relaxed upper eyelids on the live desktop at screen center and corners
     center_obs = neural_observed(150, (.5, .5))
     f_relaxed = list(center_obs.features)
-    f_relaxed[1] += 0.008
-    f_relaxed[3] += 0.008
+    f_relaxed[1] += 0.010
+    f_relaxed[3] += 0.010
     a_relaxed = list(center_obs.auxiliary_features)
-    a_relaxed[1] += 0.012 * (-a_relaxed[2])
+    a_relaxed[1] += 0.020 * (-a_relaxed[2])
     norm = float(np.linalg.norm(a_relaxed[:3]))
     a_relaxed[:3] = [v / norm for v in a_relaxed[:3]]
     a_relaxed[4] = 0.22
@@ -262,5 +262,10 @@ def test_initial_center_stare_and_relaxed_desktop_eyelids_stay_centered():
     assert predicted is not None
     assert abs(predicted[0] - .5) < .015
     assert abs(predicted[1] - .5) < .02
+    corner_obs = neural_observed(160, (.92, .92))
+    a_corner = list(corner_obs.auxiliary_features)
+    a_corner[4] = 0.22
+    corner_pred = calibration.predict(replace(corner_obs, auxiliary_features=tuple(a_corner)))
+    assert corner_pred is not None and corner_pred[0] > .95 and corner_pred[1] > .94
 
 

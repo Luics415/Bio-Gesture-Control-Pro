@@ -150,6 +150,7 @@ class PrecisionGazeCalibration(GazeCalibration):
         self._selected = None
         self._neural_low = self._neural_high = None
         self._session_y_offset = 0.0
+        self._session_edge_boost = 0.0
 
     @property
     def fitted(self):
@@ -219,11 +220,21 @@ class PrecisionGazeCalibration(GazeCalibration):
         pred = _predict_model(self._personal_model, _vector(observation, self._selected["family"]),
                               self._selected["width"])[0]
         y_offset = getattr(self, "_session_y_offset", 0.0)
-        if y_offset != 0.0:
+        edge_boost = getattr(self, "_session_edge_boost", 0.0)
+        if y_offset != 0.0 or edge_boost > 0.0:
             pred = np.array(pred, dtype=float, copy=True)
-            y_raw = float(pred[1])
-            taper = min(1.0, max(0.0, min(y_raw / 0.08, (1.0 - y_raw) / 0.08)))
-            pred[1] = y_raw + y_offset * taper
+            if y_offset != 0.0:
+                y_raw = float(pred[1])
+                taper = min(1.0, max(0.0, min((y_raw - 0.02) / 0.14, (0.90 - y_raw) / 0.14)))
+                pred[1] = y_raw + y_offset * taper
+            if edge_boost > 0.0:
+                dx = float(pred[0]) - 0.5
+                dy = float(pred[1]) - 0.5
+                rx = min(1.3, max(0.0, (abs(dx) - 0.24) / 0.24))
+                ry = min(1.3, max(0.0, (abs(dy) - 0.24) / 0.24))
+                corner = rx * ry
+                pred[0] += math.copysign((0.026 * rx * rx + 0.036 * corner) * edge_boost, dx)
+                pred[1] += math.copysign((0.024 * ry * ry + 0.038 * corner) * edge_boost, dy)
         return pred
 
     def _estimate(self, observation):
@@ -233,6 +244,22 @@ class PrecisionGazeCalibration(GazeCalibration):
         margin = np.asarray((.25, .25, .25, .28, .28, .28))
         if np.any(neural < self._neural_low - margin) or np.any(neural > self._neural_high + margin):
             return None
+        if getattr(self, "_session_edge_boost", 0.0) > 0.0:
+            features = np.asarray(observation.features)
+            f_margin = np.asarray((0.18, 0.14, 0.18, 0.14, 0.22, 0.24, 0.0, 0.24, 0.22, 0.22))
+            low, high = self._low - f_margin, self._high + f_margin
+            low[6], high[6] = self._low[6] * 0.65, self._high[6] * 1.42
+            if np.any(features < low) or np.any(features > high):
+                return None
+            binocular = features[:2] - features[2:4]
+            binocular_margin = np.asarray((0.12, 0.11))
+            if (np.any(binocular < self._binocular_low - binocular_margin)
+                    or np.any(binocular > self._binocular_high + binocular_margin)):
+                return None
+            result = self._raw_estimate(observation)
+            if result is None or not np.isfinite(result).all() or np.any(result < -0.18) or np.any(result > 1.18):
+                return None
+            return tuple(float(v) for v in np.clip(result, 0, 1))
         return super()._estimate(observation)
 
     def validate(self, samples):
@@ -294,10 +321,10 @@ class PrecisionGazeCalibration(GazeCalibration):
             for target in unique:
                 if target in val_map:
                     x_rows.append(val_map[target])
-                    sample_weights.append(2.5 if target == (.45, .55) else 1.8)
+                    sample_weights.append(2.8 if target == (.45, .55) else 1.8)
                 else:
                     x_rows.append(tr_map[target])
-                    sample_weights.append(1.0)
+                    sample_weights.append(2.0 if (min(target) <= 0.05 or max(target) >= 0.95) else 1.0)
             x = np.asarray(x_rows)
             model = _fit_model(x, targets, width, ridge, sample_weights=sample_weights)
             if not all(np.isfinite(v).all() for v in model):
@@ -306,13 +333,14 @@ class PrecisionGazeCalibration(GazeCalibration):
             neural = np.asarray([o.auxiliary_features for o, _ in combined])
             mean_abs_pitch = float(np.abs(neural[:, 4]).mean())
             human_factor = min(1.0, max(0.0, (mean_abs_pitch - 0.01) / 0.05))
+            self._session_edge_boost = human_factor
             if settled_center is not None and (.45, .55) in val_map and human_factor > 0.0:
                 interior = [t for t in ((.45, .55), (.2, .5), (.8, .5), (.5, .2), (.5, .8),
                                         (.2, .2), (.8, .2), (.2, .8), (.8, .8)) if t in val_map]
                 int_res = float(np.mean([_predict_model(model, val_map[t], width)[0][1] - t[1] for t in interior]))
                 c_res = float(_predict_model(model, val_map[(.45, .55)], width)[0][1] - 0.55)
                 combined_res = 0.5 * c_res + 0.5 * int_res
-                self._session_y_offset = float(np.clip((-combined_res - 0.028) * human_factor, -0.042, 0.01))
+                self._session_y_offset = float(np.clip((-combined_res - 0.040) * human_factor, -0.060, 0.01))
             else:
                 self._session_y_offset = 0.0
             raw_features = np.asarray([o.features for o, _ in combined])
