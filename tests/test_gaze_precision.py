@@ -223,3 +223,44 @@ def test_refine_for_session_incorporates_consistent_validation_points_and_ignore
     calibration2.unlock()
     assert not calibration2.refine_for_session(corrupted)
 
+
+def test_initial_center_stare_and_relaxed_desktop_eyelids_stay_centered():
+    calibration = PrecisionGazeCalibration(mean_error_limit=0.12, max_error_limit=0.22)
+    for stamp, target in enumerate(TRAINING_TARGETS, 1):
+        base = neural_observed(stamp, target)
+        features = list(base.features)
+        aux = list(base.auxiliary_features)
+        aux[4] = 0.22  # Natural seated head pitch
+        if target == (.5, .5):
+            # Initial wide-eyed stare on the very first calibration point
+            features[1] -= 0.012
+            features[3] -= 0.012
+        sample = replace(base, features=tuple(features), auxiliary_features=tuple(aux))
+        assert calibration.add_sample(sample, target)
+    assert calibration.fit()
+    valid_pairs = []
+    for stamp, target in enumerate(VALIDATION_TARGETS, 30):
+        base = neural_observed(stamp, target)
+        aux = list(base.auxiliary_features)
+        aux[4] = 0.22
+        valid_pairs.append((replace(base, auxiliary_features=tuple(aux)), target))
+    assert calibration.validate(valid_pairs).passed
+    assert calibration.refine_for_session(valid_pairs)
+    assert calibration._session_y_offset < -0.015
+    # Simulate slightly relaxed upper eyelids on the live desktop at screen center
+    center_obs = neural_observed(150, (.5, .5))
+    f_relaxed = list(center_obs.features)
+    f_relaxed[1] += 0.008
+    f_relaxed[3] += 0.008
+    a_relaxed = list(center_obs.auxiliary_features)
+    a_relaxed[1] += 0.012 * (-a_relaxed[2])
+    norm = float(np.linalg.norm(a_relaxed[:3]))
+    a_relaxed[:3] = [v / norm for v in a_relaxed[:3]]
+    a_relaxed[4] = 0.22
+    relaxed_sample = replace(center_obs, features=tuple(f_relaxed), auxiliary_features=tuple(a_relaxed))
+    predicted = calibration.predict(relaxed_sample)
+    assert predicted is not None
+    assert abs(predicted[0] - .5) < .015
+    assert abs(predicted[1] - .5) < .02
+
+

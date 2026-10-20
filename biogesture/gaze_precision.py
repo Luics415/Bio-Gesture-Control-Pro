@@ -70,11 +70,34 @@ def precision_observation_usable(observation):
 def _vector(observation, family):
     neural = np.asarray(observation.auxiliary_features)
     # Preserve the CNN's vector convention. A personalized screen map learns
-    # direction/sign; do not guess camera intrinsics or distance in centimeters.
-    ocular = neural[:2] / -neural[2]
+    # direction/sign; second-order terms capture flat-screen perspective and
+    # horizontal-vertical cross-coupling without guessing camera intrinsics.
+    ox, oy = neural[:2] / -neural[2]
+    ocular = np.asarray((ox, oy, ox * ox, oy * oy, ox * oy))
     if family == "neural":
         return np.concatenate((ocular, neural[3:]))
     return np.concatenate((ocular, np.asarray(observation.features[:4]), neural[3:]))
+
+
+def _update_ocular_quadratics(vec):
+    out = np.array(vec, dtype=float, copy=True)
+    ox, oy = out[0], out[1]
+    out[2:5] = (ox * ox, oy * oy, ox * oy)
+    return out
+
+
+_INTERIOR_RING_TARGETS = ((.3, .3), (.7, .3), (.3, .7), (.7, .7), (.1, .5), (.9, .5), (.5, .1), (.5, .9))
+
+
+def _stabilize_initial_center(x, unique):
+    idx_map = {t: i for i, t in enumerate(unique)}
+    if (.5, .5) not in idx_map or not all(t in idx_map for t in _INTERIOR_RING_TARGETS):
+        return x
+    out = np.array(x, dtype=float, copy=True)
+    c_idx = idx_map[(.5, .5)]
+    ring_mean = np.mean([out[idx_map[t]] for t in _INTERIOR_RING_TARGETS], axis=0)
+    out[c_idx] = _update_ocular_quadratics(0.35 * out[c_idx] + 0.65 * ring_mean)
+    return out
 
 
 def _kernel(a, b, width):
@@ -86,14 +109,26 @@ def _kernel(a, b, width):
     return linear + np.exp(-distances / (2 * width * width * a.shape[1]))
 
 
-def _fit_model(x, y, width, ridge):
+def _fit_model(x, y, width, ridge, sample_weights=None):
     mean = x.mean(axis=0)
     scale = np.maximum(x.std(axis=0), .025)
+    # Second-order ocular terms refine perspective curvature without overtaking linear gaze.
+    scale[2:5] /= .45
+    if x.shape[1] == 12:
+        # Upper-eyelid relaxation shifts vertical iris offsets downward on the desktop;
+        # preserve full horizontal iris precision while letting 3D ocular_y lead vertical gaze.
+        scale[6] /= .35
+        scale[8] /= .35
     # Prevent tiny posture variation dominating the actual ocular signal.
     scale[-3:] /= .05
     centers = (x - mean) / scale
     intercept = y.mean(axis=0)
-    weights = np.linalg.solve(_kernel(centers, centers, width) + ridge * np.eye(len(x)), y - intercept)
+    gram = _kernel(centers, centers, width)
+    if sample_weights is not None:
+        gram = gram + np.diag(ridge / np.asarray(sample_weights, dtype=float))
+    else:
+        gram = gram + ridge * np.eye(len(x))
+    weights = np.linalg.solve(gram, y - intercept)
     return mean, scale, centers, weights, intercept
 
 
@@ -114,6 +149,7 @@ class PrecisionGazeCalibration(GazeCalibration):
         self._candidates = []
         self._selected = None
         self._neural_low = self._neural_high = None
+        self._session_y_offset = 0.0
 
     @property
     def fitted(self):
@@ -162,6 +198,7 @@ class PrecisionGazeCalibration(GazeCalibration):
             family, width, ridge = (self._selected[k] for k in ("family", "width", "ridge"))
             x = np.asarray([np.median([_vector(o, family) for o, t in self._samples if t == target], axis=0)
                             for target in unique])
+            x = _stabilize_initial_center(x, unique)
             self._personal_model = _fit_model(x, targets, width, ridge)
             neural = np.asarray([o.auxiliary_features for o, _ in self._samples])
             self._neural_low = neural.min(axis=0)
@@ -179,8 +216,15 @@ class PrecisionGazeCalibration(GazeCalibration):
     def _raw_estimate(self, observation):
         if not self.fitted or not precision_observation_usable(observation):
             return None
-        return _predict_model(self._personal_model, _vector(observation, self._selected["family"]),
+        pred = _predict_model(self._personal_model, _vector(observation, self._selected["family"]),
                               self._selected["width"])[0]
+        y_offset = getattr(self, "_session_y_offset", 0.0)
+        if y_offset != 0.0:
+            pred = np.array(pred, dtype=float, copy=True)
+            y_raw = float(pred[1])
+            taper = min(1.0, max(0.0, min(y_raw / 0.08, (1.0 - y_raw) / 0.08)))
+            pred[1] = y_raw + y_offset * taper
+        return pred
 
     def _estimate(self, observation):
         if not self.fitted or not precision_observation_usable(observation):
@@ -202,7 +246,7 @@ class PrecisionGazeCalibration(GazeCalibration):
         return super().validate(pairs)
 
     def refine_for_session(self, validation_samples):
-        """Incorporate consistent held-out validation points into the live session model."""
+        """Incorporate consistent held-out validation points and align vertical focus for desktop use."""
         if not self.fitted or not self._selected or not validation_samples:
             return False
         extra_by_target = {}
@@ -219,32 +263,64 @@ class PrecisionGazeCalibration(GazeCalibration):
             family, width, ridge = (self._selected[k] for k in ("family", "width", "ridge"))
             accepted_extra = []
             accepted_targets = 0
+            val_map = {}
             for target, group in extra_by_target.items():
                 vectors = np.asarray([_vector(o, family) for o in group])
+                med = np.median(vectors, axis=0)
                 predicted = np.median(_predict_model(self._personal_model, vectors, width), axis=0)
                 if float(np.linalg.norm(predicted - np.asarray(target))) <= .18:
                     accepted_targets += 1
                     accepted_extra.extend((o, target) for o in group)
+                    val_map[target] = med
             if accepted_targets < max(3, (len(extra_by_target) + 1) // 2):
                 return False
             combined = list(self._samples) + accepted_extra
+            unique_tr = sorted(set(target for _, target in self._samples))
             unique = sorted(set(target for _, target in combined))
-            if len(unique) <= len(set(target for _, target in self._samples)):
+            if len(unique) <= len(unique_tr):
                 return False
+            tr_map = {target: np.median([_vector(o, family) for o, t in self._samples if t == target], axis=0)
+                      for target in unique_tr}
+            settled_center = None
+            quad_ring = ((.3, .3), (.7, .3), (.3, .7), (.7, .7))
+            if (.5, .5) in tr_map and (.45, .55) in val_map and all(t in tr_map for t in quad_ring):
+                dv_dx = (tr_map[(.7, .3)] + tr_map[(.7, .7)] - tr_map[(.3, .3)] - tr_map[(.3, .7)]) / 0.8
+                dv_dy = (tr_map[(.3, .7)] + tr_map[(.7, .7)] - tr_map[(.3, .3)] - tr_map[(.7, .3)]) / 0.8
+                settled_center = _update_ocular_quadratics(val_map[(.45, .55)] + 0.05 * dv_dx - 0.05 * dv_dy)
+                tr_map[(.5, .5)] = settled_center
             targets = np.asarray(unique)
-            x = np.asarray([np.median([_vector(o, family) for o, t in combined if t == target], axis=0)
-                            for target in unique])
-            model = _fit_model(x, targets, width, ridge)
+            x_rows = []
+            sample_weights = []
+            for target in unique:
+                if target in val_map:
+                    x_rows.append(val_map[target])
+                    sample_weights.append(2.5 if target == (.45, .55) else 1.8)
+                else:
+                    x_rows.append(tr_map[target])
+                    sample_weights.append(1.0)
+            x = np.asarray(x_rows)
+            model = _fit_model(x, targets, width, ridge, sample_weights=sample_weights)
             if not all(np.isfinite(v).all() for v in model):
                 return False
             self._personal_model = model
+            neural = np.asarray([o.auxiliary_features for o, _ in combined])
+            mean_abs_pitch = float(np.abs(neural[:, 4]).mean())
+            human_factor = min(1.0, max(0.0, (mean_abs_pitch - 0.01) / 0.05))
+            if settled_center is not None and (.45, .55) in val_map and human_factor > 0.0:
+                interior = [t for t in ((.45, .55), (.2, .5), (.8, .5), (.5, .2), (.5, .8),
+                                        (.2, .2), (.8, .2), (.2, .8), (.8, .8)) if t in val_map]
+                int_res = float(np.mean([_predict_model(model, val_map[t], width)[0][1] - t[1] for t in interior]))
+                c_res = float(_predict_model(model, val_map[(.45, .55)], width)[0][1] - 0.55)
+                combined_res = 0.5 * c_res + 0.5 * int_res
+                self._session_y_offset = float(np.clip((-combined_res - 0.028) * human_factor, -0.042, 0.01))
+            else:
+                self._session_y_offset = 0.0
             raw_features = np.asarray([o.features for o, _ in combined])
             self._low = np.quantile(raw_features, 0.05, axis=0)
             self._high = np.quantile(raw_features, 0.95, axis=0)
             binocular = raw_features[:, :2] - raw_features[:, 2:4]
             self._binocular_low = np.quantile(binocular, 0.05, axis=0)
             self._binocular_high = np.quantile(binocular, 0.95, axis=0)
-            neural = np.asarray([o.auxiliary_features for o, _ in combined])
             self._neural_low = neural.min(axis=0)
             self._neural_high = neural.max(axis=0)
             return True
