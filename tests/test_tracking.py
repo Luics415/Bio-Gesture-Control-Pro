@@ -219,6 +219,23 @@ class TrackingTests(unittest.TestCase):
         self.assertTrue(pipeline.capture_released.is_set())
         self.assertEqual(pipeline.latest().error, "inference failed")
 
+    def test_ocular_mode_upgrades_default_capture_resolution_to_1080p_without_touching_index(self):
+        for mode, expected_w, expected_h in (("index", 640, 480), ("eyes", 1920, 1080)):
+            pipeline = TrackingPipeline(Settings(cursor_mode=mode), Path("unused"))
+            cap = Mock()
+            cap.isOpened.return_value = True
+            cap.read.return_value = (True, FakeRGB())
+            cap.get.return_value = 30.0
+            cv2 = SimpleNamespace(CAP_DSHOW=700, CAP_MSMF=1400, CAP_PROP_FOURCC=6,
+                                  CAP_PROP_FRAME_WIDTH=3, CAP_PROP_FRAME_HEIGHT=4,
+                                  CAP_PROP_FPS=5, CAP_PROP_BUFFERSIZE=38,
+                                  VideoWriter_fourcc=Mock(return_value=1),
+                                  VideoCapture=Mock(return_value=cap))
+            pipeline._open_capture(cv2)
+            cap.set.assert_any_call(3, expected_w)
+            cap.set.assert_any_call(4, expected_h)
+            cap.release()
+
 
 if __name__ == "__main__":
     unittest.main()

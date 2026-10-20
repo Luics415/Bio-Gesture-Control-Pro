@@ -318,21 +318,21 @@ class GazeCalibration:
         features = np.asarray(observation.features)
         # Iris, 2-D posture, scale, roll and frame position all have finite
         # margins. These conservative bounds are NOT distance compensation.
-        margin = np.asarray((0.10, 0.07, 0.10, 0.07, 0.10, 0.12, 0.0, 0.12, 0.09, 0.09))
+        margin = np.asarray((0.14, 0.10, 0.14, 0.10, 0.18, 0.20, 0.0, 0.20, 0.18, 0.18))
         low, high = self._low - margin, self._high + margin
-        low[6], high[6] = self._low[6] * 0.78, self._high[6] * 1.25
+        low[6], high[6] = self._low[6] * 0.68, self._high[6] * 1.38
         if np.any(features < low) or np.any(features > high):
             return None
         # Opposite iris errors can cancel in a regression and look like a
         # perfectly central gaze. Reject excessive disagreement relative to
         # this user's training geometry; this is not a vergence model.
         binocular = features[:2] - features[2:4]
-        binocular_margin = np.asarray((0.08, 0.07))
+        binocular_margin = np.asarray((0.10, 0.09))
         if (np.any(binocular < self._binocular_low - binocular_margin)
                 or np.any(binocular > self._binocular_high + binocular_margin)):
             return None
         result = self._raw_estimate(observation)
-        if result is None or not np.isfinite(result).all() or np.any(result < -0.04) or np.any(result > 1.04):
+        if result is None or not np.isfinite(result).all() or np.any(result < -0.08) or np.any(result > 1.08):
             return None
         return tuple(float(v) for v in np.clip(result, 0, 1))
 

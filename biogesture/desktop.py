@@ -135,7 +135,7 @@ class DesktopApp:
             from .gaze_pointer import GazePointerMapper
             from .gaze_precision import PERIPHERAL_ENGINE, create_gaze_calibration
             self._gaze_session = GazeSession(create_gaze_calibration(
-                PERIPHERAL_ENGINE, mean_error_limit=0.18, max_error_limit=0.30))
+                PERIPHERAL_ENGINE, mean_error_limit=0.18, max_error_limit=0.30, ergonomic=True))
             # Eye calibration already returns monitor-normalized coordinates;
             # it must never pass through the index's camera active rectangle.
             self._gaze_mapper = GazePointerMapper(choose_monitor(self.monitors, self.settings.monitor_id))
@@ -184,7 +184,16 @@ class DesktopApp:
                 or self.output.state in ("MENU", "VOLUMEN") or self._gaze_observation is None
                 or self._gaze_observation.timestamp <= self._gaze_moved_at):
             return True
+        clicking = any(e.kind in ("press_left", "click_right") for e in self.output.events)
+        if self.output.state == "PINZA" and not clicking and self._gaze_cursor_position is not None:
+            # Keep the cursor anchored during a quick click before drag_hold expires.
+            self._gaze_moved_at = self._gaze_observation.timestamp
+            return True
         position = self._gaze_mapper.map(*self._gaze_state.pointer, self._gaze_observation.timestamp)
+        if clicking and self._gaze_cursor_position is not None:
+            if math.hypot(position[0] - self._gaze_cursor_position[0],
+                          position[1] - self._gaze_cursor_position[1]) <= 35:
+                position = self._gaze_cursor_position
         if not self.actions.move(*position):
             self.pause(True)
             self.notify(self.actions.last_error or "No se pudo mover el cursor ocular.")
@@ -886,7 +895,11 @@ class DesktopApp:
                     changes[key] = (choice_maps[key][variable.get()] if key in choice_maps
                                     else type(previous)(variable.get()))
                 candidate = replace(self.settings, performance_mode="optimal",
-                                    gaze_engine="precision-openvino-v2", **changes).validate()
+                                    gaze_engine="precision-openvino-v2", **changes)
+                if (candidate.cursor_mode == "eyes"
+                        and (candidate.capture_width, candidate.capture_height) == (640, 480)):
+                    candidate = replace(candidate, capture_width=1920, capture_height=1080)
+                candidate = candidate.validate()
                 restart_keys = ("camera_index", "capture_width", "capture_height", "capture_fps", "detection_fps",
                                 "mirror", "detection_confidence", "tracking_confidence", "cursor_mode",
                                 "gaze_engine")
@@ -997,7 +1010,8 @@ class DesktopApp:
                                       lambda: self.pipeline.latest_gaze() if self.pipeline else None,
                                       complete, close,
                                       calibration_factory=lambda: create_gaze_calibration(
-                                          PERIPHERAL_ENGINE, mean_error_limit=0.18, max_error_limit=0.30),
+                                          PERIPHERAL_ENGINE, mean_error_limit=0.18, max_error_limit=0.30,
+                                          ergonomic=True),
                                       latest_preview=lambda: self.pipeline.latest_eye_preview() if self.pipeline else None,
                                       set_preview_enabled=lambda enabled: self.pipeline.set_eye_preview_enabled(enabled)
                                       if self.pipeline else None,

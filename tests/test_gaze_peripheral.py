@@ -137,3 +137,19 @@ def test_pointer_metadata_is_allowlisted_and_never_changes_approval():
         metadata["beta"] = bad
         report = build_diagnostic_report(calibration, (), context={"pointer_filter": metadata})
         assert "pointer_filter" not in report["context"]
+
+
+def test_ergonomic_peripheral_calibration_fits_validates_and_replays():
+    calibration = create_gaze_calibration(PERIPHERAL_ENGINE, ergonomic=True)
+    assert len(calibration.training_targets) == 13
+    assert len(calibration.validation_targets) == 5
+    assert calibration.training_collection_seconds == pytest.approx(0.85)
+    for stamp, target in enumerate(calibration.training_targets, 1):
+        assert calibration.add_sample(neural_observed(stamp, target), target)
+    assert calibration.fit()
+    validation = [(neural_observed(stamp, target), target)
+                  for stamp, target in enumerate(calibration.validation_targets, 30)]
+    assert calibration.validate(validation).passed
+    payload = build_diagnostic_report(calibration, validation, include_samples=True)
+    replayed = replay_diagnostic(json.loads(json.dumps(payload, allow_nan=False)))
+    assert replayed["acceptance_report"] == payload["acceptance_report"]

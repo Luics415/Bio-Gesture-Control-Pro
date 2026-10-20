@@ -48,9 +48,21 @@ def replay_diagnostic(payload):
     if precision:
         # Closed, local registry. Reports cannot name Python modules, files,
         # pickles or executable model objects. No inference model is loaded.
-        from .gaze_precision import create_gaze_calibration
+        from .gaze_precision import ERGONOMIC_TRAINING_TARGETS, PERIPHERAL_ENGINE, create_gaze_calibration
+        extra_kwargs = {}
+        if payload["engine_id"] == PERIPHERAL_ENGINE:
+            trained_set = {
+                (float(r["target"][0]), float(r["target"][1]))
+                for r in rows
+                if isinstance(r, dict) and r.get("phase") == "training"
+                and isinstance(r.get("target"), list) and len(r["target"]) == 2
+                and all(_number(v) for v in r["target"])
+            }
+            if trained_set == set(ERGONOMIC_TRAINING_TARGETS):
+                extra_kwargs["ergonomic"] = True
         calibration = create_gaze_calibration(payload["engine_id"],
-                                              mean_error_limit=mean_limit, max_error_limit=max_limit)
+                                              mean_error_limit=mean_limit, max_error_limit=max_limit,
+                                              **extra_kwargs)
     else:
         calibration = GazeCalibration(mean_error_limit=mean_limit, max_error_limit=max_limit)
     validation = []

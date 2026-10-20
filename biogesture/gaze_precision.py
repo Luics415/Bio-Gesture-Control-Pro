@@ -39,6 +39,16 @@ PERIPHERAL_VALIDATION_TARGETS = (
     (.93, .07), (.8, .8), (.07, .07), (.2, .8),
     (.8, .5), (.5, .8), (.2, .5), (.45, .55),
 )
+# Ergonomic interactive v2 grid: comfortable 8% margins avoid eyelid occlusion
+# at extreme 4% borders while cutting interactive calibration duration in half.
+ERGONOMIC_TRAINING_TARGETS = (
+    (.5, .5), (.08, .08), (.92, .92), (.92, .08), (.08, .92),
+    (.5, .08), (.5, .92), (.08, .5), (.92, .5),
+    (.3, .3), (.7, .7), (.7, .3), (.3, .7),
+)
+ERGONOMIC_VALIDATION_TARGETS = (
+    (.2, .2), (.8, .8), (.8, .2), (.2, .8), (.45, .55),
+)
 
 
 def precision_observation_usable(observation):
@@ -176,7 +186,7 @@ class PrecisionGazeCalibration(GazeCalibration):
         if not self.fitted or not precision_observation_usable(observation):
             return None
         neural = np.asarray(observation.auxiliary_features)
-        margin = np.asarray((.15, .15, .15, .18, .18, .18))
+        margin = np.asarray((.25, .25, .25, .28, .28, .28))
         if np.any(neural < self._neural_low - margin) or np.any(neural > self._neural_high + margin):
             return None
         return super()._estimate(observation)
@@ -214,12 +224,20 @@ class PeripheralGazeCalibration(PrecisionGazeCalibration):
     validation_targets = PERIPHERAL_VALIDATION_TARGETS
     training_collection_seconds = 1.2
 
+    def __init__(self, mean_error_limit: float = 0.04, max_error_limit: float = 0.08, *, ergonomic: bool = False):
+        if ergonomic:
+            self.training_targets = ERGONOMIC_TRAINING_TARGETS
+            self.validation_targets = ERGONOMIC_VALIDATION_TARGETS
+            self.training_collection_seconds = 0.85
+        super().__init__(mean_error_limit=mean_error_limit, max_error_limit=max_error_limit)
+
     def fit(self):
         if set(target for _, target in self._samples) != set(self.training_targets):
             self.ready = False
             self._weights = self._personal_model = self._selected = None
             self._candidates = []
-            self.report = CalibrationReport(reason="Faltan los 21 objetivos centrales y perimetrales")
+            self.report = CalibrationReport(
+                reason=f"Faltan los {len(self.training_targets)} objetivos centrales y perimetrales")
             return False
         return super().fit()
 
@@ -227,7 +245,8 @@ class PeripheralGazeCalibration(PrecisionGazeCalibration):
         pairs = list(samples)
         if set(self._target(target) for _, target in pairs) != set(self.validation_targets):
             self.ready = False
-            self.report = CalibrationReport(reason="Faltan los 13 objetivos independientes, incluidos los bordes")
+            self.report = CalibrationReport(
+                reason=f"Faltan los {len(self.validation_targets)} objetivos independientes, incluidos los bordes")
             return self.report
         return super().validate(pairs)
 

@@ -284,8 +284,11 @@ class TrackingPipeline:
                 if not cap.isOpened():
                     raise OSError("La cámara no está disponible o está ocupada")
                 cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*"MJPG"))
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.settings.capture_width)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.settings.capture_height)
+                req_w, req_h = self.settings.capture_width, self.settings.capture_height
+                if self.settings.cursor_mode == "eyes" and (req_w, req_h) == (640, 480):
+                    req_w, req_h = 1920, 1080
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH, req_w)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, req_h)
                 cap.set(cv2.CAP_PROP_FPS, self.settings.capture_fps)
                 cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
                 ok, frame = cap.read()

@@ -166,7 +166,8 @@ def prepare_inputs(rgb, landmarks):
     prepared = {}
     for name, (left, top, right, bottom) in bounds.items():
         bgr = rgb[top:bottom, left:right, ::-1]
-        resized = cv2.resize(bgr, (60, 60), interpolation=cv2.INTER_CUBIC)
+        interp = cv2.INTER_AREA if bgr.shape[0] > 60 else cv2.INTER_CUBIC
+        resized = cv2.resize(bgr, (60, 60), interpolation=interp)
         prepared[name] = np.ascontiguousarray(resized.transpose(2, 0, 1)[None], dtype=np.float32)
     return prepared
 

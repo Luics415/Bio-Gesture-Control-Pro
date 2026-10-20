@@ -49,6 +49,16 @@ def test_micro_movement_holds_the_established_fixation_point():
     assert moved[0] > .7 and moved[1] > .7
 
 
+def test_small_deliberate_adjustment_glides_smoothly_without_deadband_pop():
+    smoother = GazePointerFilter()
+    centre = smoother(.5, .5, 1.0)
+    # Move slightly beyond FIXATION_RELEASE_RADIUS (.010) but within SOFT_RELEASE_RADIUS (.028)
+    for index in range(1, 8):
+        step = smoother(.525, .5, 1.0 + index * .04)
+    assert centre[0] < step[0] < .525
+    assert smoother._fixation_active is True
+
+
 @pytest.mark.parametrize("fps", [15, 24, 30, 60])
 def test_confirmed_step_reaches_ninety_percent_within_150_ms(fps):
     smoother = GazePointerFilter()

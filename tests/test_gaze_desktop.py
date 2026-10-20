@@ -105,6 +105,22 @@ def test_eye_click_moves_to_gaze_before_pressing_not_to_index_tip():
     assert native.move.call_args.args[1] == pytest.approx(.7 * 1079, abs=2)
 
 
+def test_eye_click_anchors_cursor_during_brief_pinch_before_drag_hold():
+    app, native = ocular_app()
+    stable(app, target=(.5, .5))
+    app._move_gaze(100.2)
+    anchored = app._gaze_cursor_position
+    native.reset_mock()
+    # Slight gaze twitch at the moment of pinching and during pre-drag PINZA (< 0.35s)
+    gaze(app, 100.24, target=(.508, .495))
+    primary(app, "pinch", 100.24)
+    assert native.move.call_args == call(*anchored)
+    native.reset_mock()
+    gaze(app, 100.30, target=(.52, .48))
+    primary(app, "pinch", 100.30)
+    native.move.assert_not_called()
+
+
 @pytest.mark.parametrize("loss", ["blink", "absent", "stale", "out_of_calibration"])
 def test_losing_usable_eyes_freezes_pointer_then_releases_drag_at_bounded_timeout(loss):
     app, native = ocular_app()

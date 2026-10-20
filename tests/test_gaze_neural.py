@@ -97,6 +97,17 @@ def test_preprocessing_is_bgr_f32_nchw_no_extra_mirror_or_normalization():
     np.testing.assert_array_equal(rgb, original)
 
 
+def test_1080p_eye_and_face_crops_downsample_cleanly_to_60x60():
+    hd = np.zeros((1080, 1920, 3), dtype=np.uint8)
+    hd[:, :960, 0] = 255
+    hd[:, 960:, 1] = 128
+    inputs = neural.prepare_inputs(hd, landmarks())
+    for tensor in inputs.values():
+        assert tensor.shape == (1, 3, 60, 60)
+    assert np.all(inputs["right_eye_image"][:, 2] == 255)
+    assert np.all(inputs["left_eye_image"][:, 1] == 128)
+
+
 def test_side_labels_follow_landmark_identity_even_when_image_positions_swap():
     points = landmarks()
     for point in points:
