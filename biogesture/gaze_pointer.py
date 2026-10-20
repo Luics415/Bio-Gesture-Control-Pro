@@ -37,7 +37,6 @@ class GazePointerFilter:
     # than a normal intended gaze shift.
     FIXATION_RADIUS = .0055
     FIXATION_RELEASE_RADIUS = .010
-    SOFT_RELEASE_RADIUS = .028
 
     def __init__(self):
         self._x = OneEuroFilter(self.MIN_CUTOFF, self.BETA, self.DERIVATIVE_CUTOFF)
@@ -83,18 +82,9 @@ class GazePointerFilter:
             self._candidate_fixation = None
         elif self._fixation_active:
             # Keep the pointer at the concentration point until the filtered
-            # gaze leaves the larger release radius. For fine micro-adjustments
-            # just outside the release radius, glide smoothly without jumping.
-            dist = math.dist(filtered, self._fixation)
-            if dist < self.FIXATION_RELEASE_RADIUS:
+            # gaze leaves the larger release radius.
+            if math.dist(filtered, self._fixation) < self.FIXATION_RELEASE_RADIUS:
                 filtered = self._fixation
-            elif dist < self.SOFT_RELEASE_RADIUS:
-                alpha = (dist - self.FIXATION_RADIUS) / (self.SOFT_RELEASE_RADIUS - self.FIXATION_RADIUS)
-                filtered = (
-                    self._fixation[0] + alpha * (filtered[0] - self._fixation[0]),
-                    self._fixation[1] + alpha * (filtered[1] - self._fixation[1]),
-                )
-                self._fixation = filtered
             else:
                 self._fixation_active = False
                 self._candidate_fixation = filtered

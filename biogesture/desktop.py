@@ -135,7 +135,7 @@ class DesktopApp:
             from .gaze_pointer import GazePointerMapper
             from .gaze_precision import PERIPHERAL_ENGINE, create_gaze_calibration
             self._gaze_session = GazeSession(create_gaze_calibration(
-                PERIPHERAL_ENGINE, mean_error_limit=0.18, max_error_limit=0.30, ergonomic=True))
+                PERIPHERAL_ENGINE, mean_error_limit=0.18, max_error_limit=0.30))
             # Eye calibration already returns monitor-normalized coordinates;
             # it must never pass through the index's camera active rectangle.
             self._gaze_mapper = GazePointerMapper(choose_monitor(self.monitors, self.settings.monitor_id))
@@ -583,7 +583,9 @@ class DesktopApp:
     def _render(self, packet, output):
         image = Image.fromarray(packet.rgb)
         left, top, width, height = fit_video(image.width, image.height, 550, CAMERA_HEIGHT)
-        self._photo = ImageTk.PhotoImage(image.resize((width, height), Image.Resampling.BILINEAR), master=self.root)
+        if (image.width, image.height) != (width, height):
+            image = image.resize((width, height), Image.Resampling.NEAREST)
+        self._photo = ImageTk.PhotoImage(image, master=self.root)
         self.canvas.delete("all")
         self.canvas.create_image(left, top, anchor="nw", image=self._photo)
         for sample, color in ((packet.sample, GREEN), (packet.auxiliary, "#c3a6e3")):
@@ -895,11 +897,7 @@ class DesktopApp:
                     changes[key] = (choice_maps[key][variable.get()] if key in choice_maps
                                     else type(previous)(variable.get()))
                 candidate = replace(self.settings, performance_mode="optimal",
-                                    gaze_engine="precision-openvino-v2", **changes)
-                if (candidate.cursor_mode == "eyes"
-                        and (candidate.capture_width, candidate.capture_height) == (640, 480)):
-                    candidate = replace(candidate, capture_width=1920, capture_height=1080)
-                candidate = candidate.validate()
+                                    gaze_engine="precision-openvino-v2", **changes).validate()
                 restart_keys = ("camera_index", "capture_width", "capture_height", "capture_fps", "detection_fps",
                                 "mirror", "detection_confidence", "tracking_confidence", "cursor_mode",
                                 "gaze_engine")
@@ -1010,8 +1008,7 @@ class DesktopApp:
                                       lambda: self.pipeline.latest_gaze() if self.pipeline else None,
                                       complete, close,
                                       calibration_factory=lambda: create_gaze_calibration(
-                                          PERIPHERAL_ENGINE, mean_error_limit=0.18, max_error_limit=0.30,
-                                          ergonomic=True),
+                                          PERIPHERAL_ENGINE, mean_error_limit=0.18, max_error_limit=0.30),
                                       latest_preview=lambda: self.pipeline.latest_eye_preview() if self.pipeline else None,
                                       set_preview_enabled=lambda enabled: self.pipeline.set_eye_preview_enabled(enabled)
                                       if self.pipeline else None,
