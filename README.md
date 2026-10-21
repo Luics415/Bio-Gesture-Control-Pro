@@ -1,14 +1,18 @@
 <p align="center">
-  <img src="assets/brand/anchor-approved.png" alt="Ancla de Bio-Gesture Control Pro" width="150">
+  <img src="assets/brand/splash-author.png" alt="Bio-Gesture Control Pro - Desarrollado por Luics415" width="700">
+</p>
+
+<p align="center">
+  <img src="assets/brand/anchor-approved.png" alt="Ancla de Bio-Gesture Control Pro" width="120">
 </p>
 
 <h1 align="center">Bio-Gesture Control Pro 2.7</h1>
 
-> **Rama de desarrollo 3.0:** este código identifica el prototipo como `3.0.0.dev4`.
-> Consulta [la guía 3.0](README-3.0.md) para el control ocular experimental, el rendimiento óptimo fijo y el nuevo scroll con L.
-> Las descargas y el manual enlazados a continuación corresponden a la edición pública **2.7**, no a este prototipo.
+> **Rama y evolución 3.0 / 3.5:** este repositorio incorpora las mejoras del motor de mirada de alta precisión (**Precisión v2 OpenVINO**), captura panorámica 16:9 con encuadre amplio para manos y rostro, preprocesamiento CLAHE anti-reflejos, estabilización foveal contra tambaleo y el sistema de gestos dual con mano auxiliar (scroll en L y atajos del sistema).
+> Consulta [la guía 3.0](README-3.0.md) para el control ocular experimental y [el manual de usuario](docs/manual/Guia-3.0.md).
+> Las descargas y el manual compilados enlazados a continuación corresponden a la edición pública **2.7**.
 
-<p align="center">Tu escritorio, tus gestos. Una mano principal y una auxiliar.</p>
+<p align="center">Tu escritorio, tus gestos y tu mirada. Una mano principal, una auxiliar y control ocular de precisión.</p>
 <p align="center"><strong>Desarrollado por Luics415</strong></p>
 
 <p align="center">
