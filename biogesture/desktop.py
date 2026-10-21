@@ -189,10 +189,12 @@ class DesktopApp:
             # Keep the cursor anchored during a quick click before drag_hold expires.
             self._gaze_moved_at = self._gaze_observation.timestamp
             return True
-        position = self._gaze_mapper.map(*self._gaze_state.pointer, self._gaze_observation.timestamp)
-        if clicking and self._gaze_cursor_position is not None:
+        position = self._gaze_mapper.map(*self._gaze_state.pointer, self._gaze_observation.timestamp,
+                                         observation=self._gaze_observation)
+        if (clicking or self.output.state == "PINZA") and self._gaze_cursor_position is not None:
+            anchor_radius = 45 if clicking else 28
             if math.hypot(position[0] - self._gaze_cursor_position[0],
-                          position[1] - self._gaze_cursor_position[1]) <= 35:
+                          position[1] - self._gaze_cursor_position[1]) <= anchor_radius:
                 position = self._gaze_cursor_position
         if clicking and getattr(self, "_gaze_session", None) is not None:
             calibration = getattr(self._gaze_session, "calibration", None)

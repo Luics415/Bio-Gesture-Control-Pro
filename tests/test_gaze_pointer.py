@@ -310,3 +310,107 @@ def test_peripheral_targets_do_not_overlap_status_or_controls(size):
     finally:
         dialog.destroy()
         root.destroy()
+
+
+def test_extract_head_pose_neural_and_geometric():
+    from biogesture.gaze import GazeObservation
+    from biogesture.gaze_pointer import extract_head_pose
+
+    # Invalid observation returns None
+    assert extract_head_pose(None) is None
+    assert extract_head_pose(GazeObservation(1.0, valid=False)) is None
+
+    # Neural OpenVINO features (radians)
+    obs_neural = GazeObservation(
+        timestamp=1.0,
+        valid=True,
+        auxiliary_features=(0.0, 0.0, 1.0, 0.045, -0.030, 0.010),
+    )
+    pose = extract_head_pose(obs_neural)
+    assert pose is not None
+    assert math.isclose(pose[0], 0.045, abs_tol=1e-5)
+    assert math.isclose(pose[1], -0.030, abs_tol=1e-5)
+
+    # Geometric fallback features
+    obs_geo = GazeObservation(
+        timestamp=1.0,
+        valid=True,
+        features=(0.0, 0.0, 0.0, 0.0, 0.06, 0.28, 0.3, 0.0, 0.5, 0.5),
+    )
+    pose_geo = extract_head_pose(obs_geo)
+    assert pose_geo is not None
+    assert math.isclose(pose_geo[0], 0.06 * 0.75, abs_tol=1e-5)
+    assert math.isclose(pose_geo[1], (0.28 - 0.25) * 0.75, abs_tol=1e-5)
+
+
+def test_hybrid_two_stage_transitions_and_facial_vernier_targeting():
+    from biogesture.gaze import GazeObservation
+
+    flt = GazePointerFilter()
+    assert flt.stage == "MACRO"
+    assert flt.micro_offset == (0.0, 0.0)
+
+    # Stage 1: Macro saccade and settle at target position (0.50, 0.50)
+    for i in range(25):
+        t = 1.0 + i * 0.04
+        obs = GazeObservation(t, valid=True, auxiliary_features=(0, 0, 1, 0.0, 0.0, 0))
+        flt.filter(0.50, 0.50, t, observation=obs)
+
+    # Fixation is established -> Stage 2: MICRO
+    assert flt.stage == "MICRO"
+    assert flt.face_anchor is not None
+    assert math.isclose(flt.face_anchor[0], 0.0, abs_tol=1e-3)
+    assert math.isclose(flt.face_anchor[1], 0.0, abs_tol=1e-3)
+
+    # Sub-deadzone head tremor produces 0 micro-offset
+    t_tiny = 2.05
+    obs_tiny = GazeObservation(t_tiny, valid=True, auxiliary_features=(0, 0, 1, 0.001, -0.001, 0))
+    p_tiny = flt.filter(0.50, 0.50, t_tiny, observation=obs_tiny)
+    assert math.isclose(flt.micro_offset[0], 0.0, abs_tol=1e-4)
+    assert math.isclose(flt.micro_offset[1], 0.0, abs_tol=1e-4)
+
+    # Intentional micro head turn right (+0.020 rad) and down (+0.015 rad)
+    # The cursor should smoothly nudge in the exact direction with vernier precision
+    for i in range(1, 10):
+        t = 2.10 + i * 0.04
+        obs_turn = GazeObservation(t, valid=True, auxiliary_features=(0, 0, 1, 0.020, 0.015, 0))
+        p_turn = flt.filter(0.50, 0.50, t, observation=obs_turn)
+
+    assert flt.stage == "MICRO"
+    assert flt.micro_offset[0] > 0.005  # Nudged to the right
+    assert flt.micro_offset[1] > 0.003  # Nudged downwards
+    assert p_turn[0] > 0.50
+    assert p_turn[1] > 0.50
+
+    # Stage 1 Breakout: Saccade to top-left corner (confirmed across 2 frames)
+    t_saccade1 = 2.60
+    t_saccade2 = 2.64
+    obs_saccade = GazeObservation(t_saccade1, valid=True, auxiliary_features=(0, 0, 1, 0.020, 0.015, 0))
+    flt.filter(0.10, 0.10, t_saccade1, observation=obs_saccade)
+    p_saccade = flt.filter(0.10, 0.10, t_saccade2, observation=obs_saccade)
+    assert flt.stage == "MACRO"
+    assert flt.face_anchor is None
+
+
+def test_mapper_passes_observation_for_hybrid_physical_mapping():
+    from biogesture.coordinates import RectMonitor
+    from biogesture.gaze import GazeObservation
+
+    monitor = RectMonitor("test", "Test", 0, 0, 1920, 1080)
+    mapper = GazePointerMapper(monitor)
+
+    # Macro settle
+    for i in range(5):
+        t = 1.0 + i * 0.04
+        obs = GazeObservation(t, valid=True, auxiliary_features=(0, 0, 1, 0.0, 0.0, 0))
+        mapper.map(0.50, 0.50, t, observation=obs)
+
+    assert mapper.stage == "MICRO"
+
+    # Micro nudge with head turn
+    t_nudge = 1.30
+    obs_nudge = GazeObservation(t_nudge, valid=True, auxiliary_features=(0, 0, 1, 0.025, -0.018, 0))
+    x_px, y_px = mapper.map(0.50, 0.50, t_nudge, observation=obs_nudge)
+
+    assert x_px > 960   # Turned right -> moved right in pixels
+    assert y_px < 540   # Tilted up -> moved up in pixels
