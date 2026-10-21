@@ -151,6 +151,9 @@ class PrecisionGazeCalibration(GazeCalibration):
         self._neural_low = self._neural_high = None
         self._session_y_offset = 0.0
         self._session_edge_boost = 0.0
+        self._baseline_scale = self._init_scale = None
+        self._baseline_mid_y = self._init_mid_y = None
+        self._online_bias = np.zeros(2, dtype=float)
 
     @property
     def fitted(self):
@@ -204,6 +207,10 @@ class PrecisionGazeCalibration(GazeCalibration):
             neural = np.asarray([o.auxiliary_features for o, _ in self._samples])
             self._neural_low = neural.min(axis=0)
             self._neural_high = neural.max(axis=0)
+            raw_features = np.asarray([o.features for o, _ in self._samples])
+            self._baseline_scale = self._init_scale = float(np.median(raw_features[:, 6]))
+            self._baseline_mid_y = self._init_mid_y = float(np.median(raw_features[:, 9]))
+            self._online_bias = np.zeros(2, dtype=float)
             if not all(np.isfinite(v).all() for v in self._personal_model):
                 raise ValueError("Ajuste personal no finito")
         except (ValueError, np.linalg.LinAlgError, FloatingPointError):
@@ -219,22 +226,39 @@ class PrecisionGazeCalibration(GazeCalibration):
             return None
         pred = _predict_model(self._personal_model, _vector(observation, self._selected["family"]),
                               self._selected["width"])[0]
+        pred = np.array(pred, dtype=float, copy=True)
+        # Z-distance compensation (leaning closer/further in chair) via interocular span
+        base_scale = getattr(self, "_baseline_scale", None)
+        obs_scale = float(observation.features[6])
+        if base_scale is not None and base_scale > 0.01 and obs_scale > 0.01:
+            z_ratio = base_scale / obs_scale
+            if abs(z_ratio - 1.0) > 0.015:
+                z_factor = min(1.24, max(0.82, 1.0 + 0.65 * (z_ratio - 1.0)))
+                pred[0] = 0.5 + (pred[0] - 0.5) * z_factor
+                pred[1] = 0.5 + (pred[1] - 0.5) * z_factor
+        # Vertical chair-elevation parallax compensation via eye midpoint Y
+        base_mid_y = getattr(self, "_baseline_mid_y", None)
+        if base_mid_y is not None:
+            d_mid_y = float(observation.features[9]) - base_mid_y
+            if abs(d_mid_y) > 0.008:
+                pred[1] -= float(np.clip(0.18 * d_mid_y, -0.025, 0.025))
         y_offset = getattr(self, "_session_y_offset", 0.0)
         edge_boost = getattr(self, "_session_edge_boost", 0.0)
-        if y_offset != 0.0 or edge_boost > 0.0:
-            pred = np.array(pred, dtype=float, copy=True)
-            if y_offset != 0.0:
-                y_raw = float(pred[1])
-                taper = min(1.0, max(0.0, min((y_raw - 0.02) / 0.14, (0.90 - y_raw) / 0.14)))
-                pred[1] = y_raw + y_offset * taper
-            if edge_boost > 0.0:
-                dx = float(pred[0]) - 0.5
-                dy = float(pred[1]) - 0.5
-                rx = min(1.3, max(0.0, (abs(dx) - 0.24) / 0.24))
-                ry = min(1.3, max(0.0, (abs(dy) - 0.24) / 0.24))
-                corner = rx * ry
-                pred[0] += math.copysign((0.026 * rx * rx + 0.036 * corner) * edge_boost, dx)
-                pred[1] += math.copysign((0.024 * ry * ry + 0.038 * corner) * edge_boost, dy)
+        if y_offset != 0.0:
+            y_raw = float(pred[1])
+            taper = min(1.0, max(0.0, min((y_raw - 0.02) / 0.14, (0.90 - y_raw) / 0.14)))
+            pred[1] = y_raw + y_offset * taper
+        if edge_boost > 0.0:
+            dx = float(pred[0]) - 0.5
+            dy = float(pred[1]) - 0.5
+            rx = min(1.3, max(0.0, (abs(dx) - 0.24) / 0.24))
+            ry = min(1.3, max(0.0, (abs(dy) - 0.24) / 0.24))
+            corner = rx * ry
+            pred[0] += math.copysign((0.026 * rx * rx + 0.036 * corner) * edge_boost, dx)
+            pred[1] += math.copysign((0.024 * ry * ry + 0.038 * corner) * edge_boost, dy)
+        online_bias = getattr(self, "_online_bias", None)
+        if online_bias is not None:
+            pred += online_bias
         return pred
 
     def _estimate(self, observation):
@@ -351,9 +375,42 @@ class PrecisionGazeCalibration(GazeCalibration):
             self._binocular_high = np.quantile(binocular, 0.95, axis=0)
             self._neural_low = neural.min(axis=0)
             self._neural_high = neural.max(axis=0)
+            val_raw = np.asarray([o.features for o, _ in accepted_extra])
+            self._baseline_scale = self._init_scale = float(np.median(val_raw[:, 6]))
+            self._baseline_mid_y = self._init_mid_y = float(np.median(val_raw[:, 9]))
+            self._online_bias = np.zeros(2, dtype=float)
             return True
         except (ValueError, np.linalg.LinAlgError, FloatingPointError):
             return False
+
+    def record_click_feedback(self, observation, target_xy):
+        """Adapt session posture baseline and micro-drift from confirmed desktop clicks."""
+        if not self.ready or not self.fitted or not precision_observation_usable(observation):
+            return False
+        target = self._target(target_xy)
+        if target is None:
+            return False
+        pred = self._raw_estimate(observation)
+        if pred is None or not np.isfinite(pred).all():
+            return False
+        error_vec = np.asarray(target, dtype=float) - np.asarray(pred, dtype=float)
+        dist = float(np.linalg.norm(error_vec))
+        if dist > 0.12:
+            return False
+        if dist >= 0.0015:
+            bias = getattr(self, "_online_bias", np.zeros(2, dtype=float))
+            self._online_bias = np.clip(bias + 0.14 * error_vec, -0.028, 0.028)
+        init_scale = getattr(self, "_init_scale", None)
+        if init_scale is not None and init_scale > 0.01:
+            obs_scale = float(observation.features[6])
+            updated_scale = 0.90 * self._baseline_scale + 0.10 * obs_scale
+            self._baseline_scale = float(np.clip(updated_scale, init_scale * 0.80, init_scale * 1.25))
+        init_mid_y = getattr(self, "_init_mid_y", None)
+        if init_mid_y is not None:
+            obs_mid_y = float(observation.features[9])
+            updated_mid_y = 0.90 * self._baseline_mid_y + 0.10 * obs_mid_y
+            self._baseline_mid_y = float(np.clip(updated_mid_y, init_mid_y - 0.06, init_mid_y + 0.06))
+        return True
 
     def diagnostic_model(self):
         return {

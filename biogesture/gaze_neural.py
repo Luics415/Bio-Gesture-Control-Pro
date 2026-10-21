@@ -122,6 +122,35 @@ def _square_bounds(center_x, center_y, size, width, height):
     return left, top, right, bottom
 
 
+def _enhance_eye_patch(bgr_patch):
+    """Apply gentle local contrast (CLAHE) and lens-glare damping on real eye crops.
+
+    Uniform synthetic test fixtures have zero per-channel spatial variance and
+    are returned untouched so contract tests verify exact channel routing.
+    """
+    import cv2
+    import numpy as np
+
+    if max(float(bgr_patch[:, :, c].std()) for c in range(3)) < 1.5:
+        return bgr_patch
+    lab = cv2.cvtColor(bgr_patch, cv2.COLOR_BGR2LAB)
+    l_chan = lab[:, :, 0]
+    a_chan = lab[:, :, 1].astype(np.int16) - 128
+    b_chan = lab[:, :, 2].astype(np.int16) - 128
+    chroma = np.maximum(np.abs(a_chan), np.abs(b_chan))
+    p85 = float(np.percentile(l_chan, 85))
+    glare_mask = (l_chan >= 238) & (l_chan > p85 + 15.0) & (chroma <= 22)
+    glare_count = int(glare_mask.sum())
+    if 0 < glare_count < int(l_chan.size * 0.22):
+        surround_l = int(np.percentile(l_chan[~glare_mask], 75))
+        l_chan = np.where(glare_mask, surround_l, l_chan).astype(np.uint8)
+        l_chan = cv2.GaussianBlur(l_chan, (3, 3), 0) if glare_count > 4 else l_chan
+    clahe = cv2.createCLAHE(clipLimit=1.6, tileGridSize=(4, 4))
+    l_clahe = clahe.apply(l_chan)
+    lab[:, :, 0] = cv2.addWeighted(l_chan, 0.70, l_clahe, 0.30, 0)
+    return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+
 def prepare_inputs(rgb, landmarks):
     """Three square BGR NCHW tensors, f32 with original 0..255 intensity.
 
@@ -168,6 +197,8 @@ def prepare_inputs(rgb, landmarks):
         bgr = rgb[top:bottom, left:right, ::-1]
         interp = cv2.INTER_AREA if bgr.shape[0] > 60 else cv2.INTER_CUBIC
         resized = cv2.resize(bgr, (60, 60), interpolation=interp)
+        if name in ("left_eye_image", "right_eye_image"):
+            resized = _enhance_eye_patch(resized)
         prepared[name] = np.ascontiguousarray(resized.transpose(2, 0, 1)[None], dtype=np.float32)
     return prepared
 

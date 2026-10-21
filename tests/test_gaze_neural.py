@@ -429,3 +429,19 @@ def test_fresh_native_inference_never_initializes_converter_telemetry_or_network
                             capture_output=True, text=True, timeout=30)
     assert result.returncode == 0, result.stdout + result.stderr
     assert "no telemetry, no network attempts" in result.stdout
+
+
+def test_enhance_eye_patch_attenuates_glare_and_boosts_shadow_contrast():
+    patch = np.full((60, 60, 3), 55, dtype=np.uint8)
+    # Dark pupil/iris center + lighter sclera ring + harsh white lens glare spot
+    patch[15:45, 10:50] = 95
+    patch[22:38, 22:38] = 25
+    patch[26:30, 26:30] = 252
+    enhanced = neural._enhance_eye_patch(patch)
+    assert enhanced.shape == (60, 60, 3) and enhanced.dtype == np.uint8
+    # Specular glare peak is attenuated while iris-sclera contrast increases
+    assert enhanced[27, 27].mean() < 235
+    before_contrast = float(patch[18, 15].mean() - patch[32, 32].mean())
+    after_contrast = float(enhanced[18, 15].mean() - enhanced[32, 32].mean())
+    assert after_contrast > before_contrast
+

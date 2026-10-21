@@ -269,3 +269,35 @@ def test_initial_center_stare_and_relaxed_desktop_eyelids_stay_centered():
     assert corner_pred is not None and corner_pred[0] > .95 and corner_pred[1] > .94
 
 
+def test_z_distance_and_chair_parallax_compensation_maintain_edge_reach():
+    calibration = fitted()
+    assert calibration.validate(validation()).passed
+    # Simulate leaning back in the chair (interocular scale drops by ~15% and angular excursion compresses)
+    CompressedTarget = (.5 + (.8 - .5) * .91, .5 + (.8 - .5) * .91)
+    obs = neural_observed(120, CompressedTarget)
+    features = list(obs.features)
+    features[6] *= 0.86  # 14% smaller interocular span in frame (further from webcam)
+    leaned_back = replace(obs, features=tuple(features))
+    predicted = calibration.predict(leaned_back)
+    assert predicted is not None
+    assert math.dist(predicted, (.8, .8)) < 0.015
+
+
+def test_record_click_feedback_adapts_online_bias_and_posture_baseline():
+    calibration = fitted()
+    assert calibration.validate(validation()).passed
+    obs = neural_observed(130, (.48, .48))
+    features = list(obs.features)
+    features[6] *= 0.92
+    features[9] += 0.02
+    sample = replace(obs, features=tuple(features))
+    before = calibration.predict(sample)
+    for _ in range(5):
+        assert calibration.record_click_feedback(sample, (.5, .5))
+    after = calibration.predict(sample)
+    assert math.dist(after, (.5, .5)) < math.dist(before, (.5, .5))
+    # Wild outlier click targets (>12% away from gaze) are rejected
+    assert not calibration.record_click_feedback(sample, (.95, .95))
+
+
+

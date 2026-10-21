@@ -194,6 +194,15 @@ class DesktopApp:
             if math.hypot(position[0] - self._gaze_cursor_position[0],
                           position[1] - self._gaze_cursor_position[1]) <= 35:
                 position = self._gaze_cursor_position
+        if clicking and getattr(self, "_gaze_session", None) is not None:
+            calibration = getattr(self._gaze_session, "calibration", None)
+            if calibration is not None and hasattr(calibration, "record_click_feedback"):
+                m = self._gaze_mapper.monitor
+                norm_xy = (
+                    min(1.0, max(0.0, (position[0] - m.left) / max(1, m.width - 1))),
+                    min(1.0, max(0.0, (position[1] - m.top) / max(1, m.height - 1))),
+                )
+                calibration.record_click_feedback(self._gaze_observation, norm_xy)
         if not self.actions.move(*position):
             self.pause(True)
             self.notify(self.actions.last_error or "No se pudo mover el cursor ocular.")
